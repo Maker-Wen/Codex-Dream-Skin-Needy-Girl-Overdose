@@ -7,7 +7,7 @@ Node.js 或执行 PowerShell 脚本。
 
 先从 Microsoft Store 安装当前用户的官方 `OpenAI.Codex` 桌面应用，至少启动一次后退出。
 
-1. 在 GitHub 的 [Releases](https://github.com/EmiyaKatuz/Codex-Dream-Skin/releases) 下载最新的
+1. 在 GitHub 的 [Releases](https://github.com/EmiyaKatuz/Codex-Dream-Skin-Needy-Girl-Overdose/releases) 下载最新的
    `CodexDreamSkin-Setup-vX.Y.Z.exe` 与 `SHA256SUMS.txt`，并在运行前核对 SHA-256。
 2. 双击安装器，按向导完成安装。默认安装到当前用户的 LocalAppData，不需要管理员权限；安装前
    请先退出 Codex。

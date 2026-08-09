@@ -36,11 +36,19 @@ function makeElement({
   style = {},
   checkVisibility = true,
   isConnected = true,
+  attributes = {},
+  children = [],
+  firstElementChild = children[0] ?? null,
+  closest = () => null,
+  querySelector = () => null,
+  querySelectorAll = () => [],
 } = {}) {
   return {
     isConnected,
     classList: [],
     childNodes: [],
+    children,
+    firstElementChild,
     textContent: "",
     _style: {
       display: "block",
@@ -51,11 +59,11 @@ function makeElement({
       ...style,
     },
     getBoundingClientRect: () => rect,
-    getAttribute: () => null,
+    getAttribute: (name) => attributes[name] ?? null,
     checkVisibility: () => checkVisibility,
-    closest: () => null,
-    querySelector: () => null,
-    querySelectorAll: () => [],
+    closest,
+    querySelector,
+    querySelectorAll,
   };
 }
 
@@ -67,7 +75,12 @@ function makeDomFixture({
   shellCandidates = [shell],
   sidebarCandidates = [sidebar],
   composerCandidates = [composer],
+  homeCandidates = [],
+  homeIconCandidates = [],
+  gameSourceCandidates = [],
+  suggestionCandidates = [],
   settings = null,
+  themeId = "fixture-theme",
   visibilityState = "visible",
   viewportWidth = 1280,
   viewportHeight = 800,
@@ -89,14 +102,20 @@ function makeDomFixture({
       if (selector === selectors.sidebar) return sidebarCandidates[0] ?? null;
       if (selector === selectors.composer) return composerCandidates[0] ?? null;
       if (selector === selectors.settings || selector === selectors.themePreview) return settings;
-      if (selector === selectors.home || selector === selectors.homeIcon ||
-          selector === selectors.gameSource || selector === selectors.suggestions) return null;
+      if (selector === selectors.home) return homeCandidates[0] ?? null;
+      if (selector === selectors.homeIcon) return homeIconCandidates[0] ?? null;
+      if (selector === selectors.gameSource) return gameSourceCandidates[0] ?? null;
+      if (selector === selectors.suggestions) return suggestionCandidates[0] ?? null;
       return null;
     },
     querySelectorAll(selector) {
       if (selector === selectors.shell) return shellCandidates;
       if (selector === selectors.sidebar) return sidebarCandidates;
       if (selector === selectors.composer) return composerCandidates;
+      if (selector === selectors.home) return homeCandidates;
+      if (selector === selectors.homeIcon) return homeIconCandidates;
+      if (selector === selectors.gameSource) return gameSourceCandidates;
+      if (selector === selectors.suggestions) return suggestionCandidates;
       if (selector === selectors.settings || selector === selectors.themePreview) {
         return settings ? [settings] : [];
       }
@@ -107,7 +126,7 @@ function makeDomFixture({
   const window = {
     __CODEX_DREAM_SKIN_STATE__: {
       version: SKIN_VERSION,
-      themeId: "fixture-theme",
+      themeId,
       revision: "fixture-revision",
       styleMode: "style",
       styleNode,
@@ -149,11 +168,15 @@ function makeSession({
   };
 }
 
-async function verify(overrides = {}) {
+async function verify({
+  expectedThemeId = "fixture-theme",
+  expectedRevision = "fixture-revision",
+  ...overrides
+} = {}) {
   return verifySession(
     makeSession(overrides),
-    "fixture-theme",
-    "fixture-revision",
+    expectedThemeId,
+    expectedRevision,
   );
 }
 
@@ -202,6 +225,34 @@ test("visibility scans past stale candidates and accepts opacity above the share
   assert.equal(result.shell.visible, true);
   assert.equal(result.sidebar.visible, true);
   assert.equal(result.composer.visible, true);
+});
+
+test("visible Home with a hidden signal cannot bypass the Internet Angel deck gate", async () => {
+  const hero = makeElement({ rect: makeRect(900, 620, 200, 80) });
+  let home;
+  const hiddenHomeIcon = makeElement({
+    style: { display: "none" },
+    closest: () => home,
+  });
+  home = makeElement({
+    rect: makeRect(1000, 700, 160, 40),
+    children: [hero],
+    firstElementChild: hero,
+  });
+  const result = await verify({
+    expectedThemeId: "preset-internet-angel",
+    dom: makeDomFixture({
+      scope: { level: "L1", baseState: "home", missingL1: [] },
+      themeId: "preset-internet-angel",
+      homeCandidates: [home],
+      homeIconCandidates: [hiddenHomeIcon],
+    }),
+  });
+  assert.equal(result.homePresent, true);
+  assert.equal(result.homeRoute, true);
+  assert.equal(result.angelDeckReady, false);
+  assert.equal(result.checks.angelDeckPass, false);
+  assert.equal(result.pass, false);
 });
 
 test("transient Runtime.evaluate failures are retried inside the bounded deadline", async () => {

@@ -86,9 +86,48 @@ done
 for upgraded_helper in check-image-dimensions.mjs image-metadata.mjs write-theme.mjs; do
   /usr/bin/grep -F -q "$upgraded_helper" "$ROOT/scripts/install-menubar-macos.sh"
 done
+if ! /usr/bin/grep -F -q 'mktemp -d "$INSTALL_ROOT.menubar-installing.XXXXXX"' \
+     "$ROOT/scripts/install-menubar-macos.sh" ||
+   ! /usr/bin/grep -F -q 'rsync -a "$INSTALL_ROOT/" "$MENU_UPGRADE_STAGE/"' \
+     "$ROOT/scripts/install-menubar-macos.sh" ||
+   ! /usr/bin/grep -F -q 'mv "$INSTALL_ROOT" "$MENU_UPGRADE_PREVIOUS"' \
+     "$ROOT/scripts/install-menubar-macos.sh" ||
+   ! /usr/bin/grep -F -q 'mv "$MENU_UPGRADE_STAGE" "$INSTALL_ROOT"' \
+     "$ROOT/scripts/install-menubar-macos.sh" ||
+   ! /usr/bin/grep -F -q 'cmp -s "$source" "$target"' \
+     "$ROOT/scripts/install-menubar-macos.sh"; then
+  printf 'Standalone menu upgrades must verify a complete staged engine and publish it with directory renames.\n' >&2
+  exit 1
+fi
+if /usr/bin/grep -F -q 'cp -f "$PROJECT_ROOT/scripts/$name" "$INSTALL_ROOT/scripts/$name"' \
+   "$ROOT/scripts/install-menubar-macos.sh"; then
+  printf 'Standalone menu upgrades must not overwrite coupled loader/helper files in the live engine.\n' >&2
+  exit 1
+fi
+if ! /usr/bin/grep -F -q 'mktemp "$PLUGIN_DIR/.codex_dream_skin.10s.sh.installing.XXXXXX"' \
+     "$ROOT/scripts/install-menubar-macos.sh" ||
+   ! /usr/bin/grep -F -q 'mv -f "$PLUGIN_STAGE" "$PLUGIN_DST"' \
+     "$ROOT/scripts/install-menubar-macos.sh"; then
+  printf 'The active SwiftBar plugin must be staged and atomically replaced.\n' >&2
+  exit 1
+fi
 if /usr/bin/grep -F -q 'Fei-Away/Codex-Dream-Skin/releases' \
   "$ROOT/menubar-app/Sources/CodexDreamSkinMenuBar/AppDelegate.swift"; then
   printf 'Native update fallbacks must point to this fork, not upstream.\n' >&2
+  exit 1
+fi
+if ! /usr/bin/grep -F -q 'REPOSITORY="EmiyaKatuz/Codex-Dream-Skin-Needy-Girl-Overdose"' \
+     "$ROOT/scripts/check-update-macos.sh" ||
+   ! /usr/bin/grep -F -q \
+     'https://github.com/EmiyaKatuz/Codex-Dream-Skin-Needy-Girl-Overdose/releases/latest' \
+     "$ROOT/menubar-app/Sources/CodexDreamSkinMenuBar/AppDelegate.swift"; then
+  printf 'macOS update checks and native fallbacks must use this fork canonical release source.\n' >&2
+  exit 1
+fi
+if /usr/bin/grep -F -q 'EmiyaKatuz/Codex-Dream-Skin/releases' \
+   "$ROOT/scripts/check-update-macos.sh" \
+   "$ROOT/menubar-app/Sources/CodexDreamSkinMenuBar/AppDelegate.swift"; then
+  printf 'macOS update paths must not retain the obsolete short repository alias.\n' >&2
   exit 1
 fi
 UPDATE_JSON="$({
@@ -100,7 +139,7 @@ UPDATE_JSON="$({
   const expectedCurrentVersion = `v${process.argv[2]}`;
   if (value.currentVersion !== expectedCurrentVersion || value.latestVersion !== "v9.8.7") process.exit(1);
   if (!value.updateAvailable) process.exit(1);
-  if (value.releaseUrl !== "https://github.com/EmiyaKatuz/Codex-Dream-Skin/releases/latest") process.exit(1);
+  if (value.releaseUrl !== "https://github.com/EmiyaKatuz/Codex-Dream-Skin-Needy-Girl-Overdose/releases/latest") process.exit(1);
 ' "$UPDATE_JSON" "$(/usr/bin/tr -d '[:space:]' < "$ROOT/VERSION")"
 # SwiftPM and the universal DMG builder both use hidden `.build*` scratch
 # directories. Keep generated object files out of the source-policy scan.
@@ -223,6 +262,7 @@ fi
 "$ROOT/tests/community-apply-transaction.test.sh"
 "$ROOT/tests/theme-zip-extract.test.sh"
 "$ROOT/tests/installer-preflight.test.sh"
+"$ROOT/tests/menubar-upgrade-transaction.test.sh"
 "$NODE" "$ROOT/tests/theme-config.test.mjs"
 
 # check-image-dimensions rejects decompression bombs before sips can rasterize them.
@@ -316,7 +356,7 @@ STANDALONE_DOCS="$TMP/standalone-source-docs"
   "$STANDALONE_ROOT/docs/reference-background-prompt-guide.md"
 /usr/bin/grep -F -q 'assets/portal-hero.png' \
   "$STANDALONE_ROOT/docs/reference-background-prompt-guide.md"
-/usr/bin/grep -F -q 'https://github.com/EmiyaKatuz/Codex-Dream-Skin/blob/main/windows/assets/theme.json' \
+/usr/bin/grep -F -q 'https://github.com/EmiyaKatuz/Codex-Dream-Skin-Needy-Girl-Overdose/blob/main/windows/assets/theme.json' \
   "$STANDALONE_ROOT/docs/reference-background-prompt-guide.md"
 [ -f "$STANDALONE_ROOT/docs/images/hero-banner-red-white.png" ]
 [ ! -e "$STANDALONE_ROOT/docs/images/presets/arina-hashimoto-source.png" ]
@@ -338,7 +378,7 @@ STANDALONE_REPACK="$TMP/standalone-repack"
 "$STANDALONE_SOURCE/scripts/prepare-standalone-docs.sh" "$STANDALONE_REPACK"
 REPACK_GUIDE="$STANDALONE_REPACK/docs/reference-background-prompt-guide.md"
 /usr/bin/grep -F -q \
-  'https://github.com/EmiyaKatuz/Codex-Dream-Skin/blob/main/windows/assets/theme.json' \
+  'https://github.com/EmiyaKatuz/Codex-Dream-Skin-Needy-Girl-Overdose/blob/main/windows/assets/theme.json' \
   "$REPACK_GUIDE"
 if /usr/bin/grep -E -q 'tree/main/windows/assets|blob/main/https://' "$REPACK_GUIDE"; then
   printf 'Standalone prompt URL rewriting is not idempotent.\n' >&2

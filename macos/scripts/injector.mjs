@@ -261,7 +261,7 @@ export function assessRendererVerification(renderer, nativeWindow, expected) {
     result.themeId || expected.expectedThemeId || "",
   ).trim());
   const angelSurfacePass = !angelThemeExpected || result.angelSurfacePass === true;
-  const angelDeckPass = !result.homeRoute
+  const angelDeckPass = !homeRoute
     || !angelThemeExpected
     || result.angelDeckReady;
   const visibleSuggestionLabels = Array.isArray(result.suggestionLabels)
@@ -1356,7 +1356,7 @@ export async function verifySession(session, expectedThemeId = null, expectedRev
       return candidateBox.x + candidateBox.width >= innerWidth - 64;
     }) ?? null;
     const environment = box(environmentNode);
-    const threadRoute = Boolean(document.querySelector('.thread-scroll-container')) && !homeRoute;
+    const threadRoute = Boolean(document.querySelector('.thread-scroll-container')) && !home;
     const runtime = window.__CODEX_DREAM_SKIN_STATE__;
     const adopted = runtime?.styleMode === 'adopted' &&
       [...document.adoptedStyleSheets].includes(runtime.styleSheet);
@@ -1374,7 +1374,7 @@ export async function verifySession(session, expectedThemeId = null, expectedRev
       businessClassPollution: [...document.querySelectorAll('[class]')].filter((node) =>
         [...node.classList].some((name) => /^(?:dream-|codex-dream-skin(?:-|$))/.test(name))
       ).length,
-      homeRoute: Boolean(homeRoute),
+      homeRoute: Boolean(home),
       homePresent: Boolean(home),
       hero,
       cards: cardBoxes,
@@ -1442,7 +1442,7 @@ export async function verifySession(session, expectedThemeId = null, expectedRev
     result.environmentInsideViewport = environmentInsideViewport;
     const payloadPass = (!expectedThemeId || result.themeId === expectedThemeId) &&
       (!expectedRevision || result.revision === expectedRevision);
-    const angelDeckPass = !homeRoute || !angelThemeExpected ||
+    const angelDeckPass = !result.homeRoute || !angelThemeExpected ||
       result.angelDeckReady;
     const composerAngelPass = !angelThemeExpected || !result.threadRoute || Boolean(
       result.composer?.visible && result.composerStyle?.component === 'composer' &&

@@ -3,7 +3,7 @@
 set -euo pipefail
 ROOT="$(cd "$(dirname "$0")/.." && pwd -P)"
 VERSION_PATH="$ROOT/VERSION"
-REPOSITORY="EmiyaKatuz/Codex-Dream-Skin"
+REPOSITORY="EmiyaKatuz/Codex-Dream-Skin-Needy-Girl-Overdose"
 RELEASE_URL="https://github.com/$REPOSITORY/releases/latest"
 JSON="false"
 INTERACTIVE="false"

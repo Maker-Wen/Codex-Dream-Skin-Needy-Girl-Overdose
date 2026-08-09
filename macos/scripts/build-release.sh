@@ -29,7 +29,7 @@ rewrite_standalone_links() {
   local temporary="${file}.standalone"
   /usr/bin/sed \
     -e 's#\.\./docs/#docs/#g' \
-    -e 's#\.\./windows/#https://github.com/EmiyaKatuz/Codex-Dream-Skin/tree/main/windows/#g' \
+    -e 's#\.\./windows/#https://github.com/EmiyaKatuz/Codex-Dream-Skin-Needy-Girl-Overdose/tree/main/windows/#g' \
     "$file" > "$temporary"
   /bin/mv "$temporary" "$file"
 }

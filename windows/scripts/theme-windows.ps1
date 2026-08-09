@@ -466,8 +466,12 @@ function Update-DreamSkinLegacyManagedActiveThemeSchema {
   }
   if ($theme.PSObject.Properties['schemaVersion']) { return $false }
   $idProperty = $theme.PSObject.Properties['id']
-  if ($null -eq $idProperty -or $idProperty.Value -isnot [string] -or
-    $idProperty.Value -cne 'custom') {
+  if ($null -eq $idProperty -or $idProperty.Value -isnot [string]) {
+    return $false
+  }
+  $legacyId = [string]$idProperty.Value
+  if ($legacyId -cne 'custom' -and
+    $legacyId -cnotmatch '^[0-9]{8}-[0-9]{6}-[0-9a-f]{8}$') {
     return $false
   }
   $imageProperty = $theme.PSObject.Properties['image']
@@ -476,8 +480,10 @@ function Update-DreamSkinLegacyManagedActiveThemeSchema {
     throw 'Legacy managed custom theme must name its image.'
   }
   $image = [string]$imageProperty.Value
-  if ([System.IO.Path]::IsPathRooted($image)) {
-    throw 'Legacy managed custom theme image path must be relative.'
+  if ([System.IO.Path]::IsPathRooted($image) -or
+    [System.IO.Path]::GetFileName($image) -cne $image -or
+    $image -cnotmatch '^art-[0-9]{8}-[0-9]{6}-[0-9]{3}-[0-9a-f]{8}\.(?:png|jpe?g|webp)$') {
+    throw 'Legacy managed active theme image must match the v1.5.13 generated filename.'
   }
   $imagePath = [System.IO.Path]::GetFullPath((Join-Path $directory $image))
   if (-not (Test-DreamSkinThemePathWithin -Path $imagePath -Root $directory) -or
@@ -486,6 +492,81 @@ function Update-DreamSkinLegacyManagedActiveThemeSchema {
   }
   Assert-DreamSkinNoReparseComponents -Path $imagePath
   Assert-DreamSkinImageFile -Path $imagePath
+  $theme | Add-Member -NotePropertyName schemaVersion -NotePropertyValue 1
+  Write-DreamSkinUtf8FileAtomically -Path $themePath `
+    -Content (($theme | ConvertTo-Json -Depth 8) + "`r`n")
+  return $true
+}
+
+function Update-DreamSkinLegacyManagedSavedThemeSchema {
+  param(
+    [Parameter(Mandatory = $true)][string]$ThemeDirectory,
+    [Parameter(Mandatory = $true)][string]$ManagedRoot
+  )
+  $root = [System.IO.Path]::GetFullPath($ManagedRoot).TrimEnd('\')
+  $savedRoot = (Join-Path $root 'themes').TrimEnd('\')
+  $directory = [System.IO.Path]::GetFullPath($ThemeDirectory).TrimEnd('\')
+  $parent = [System.IO.Path]::GetDirectoryName($directory).TrimEnd('\')
+  if (-not $parent.Equals($savedRoot, [System.StringComparison]::OrdinalIgnoreCase) -or
+    -not (Test-DreamSkinThemePathWithin -Path $directory -Root $savedRoot)) {
+    return $false
+  }
+  Assert-DreamSkinNoReparseComponents -Path $directory
+  $themePath = Join-Path $directory 'theme.json'
+  Assert-DreamSkinNoReparseComponents -Path $themePath
+  if (-not (Test-Path -LiteralPath $themePath -PathType Leaf)) { return $false }
+  try {
+    $theme = (Read-DreamSkinUtf8File -Path $themePath) | ConvertFrom-Json -ErrorAction Stop
+  } catch {
+    throw "Managed saved theme metadata is invalid JSON: $themePath"
+  }
+  if ($null -eq $theme -or $theme -is [string] -or $theme -is [array]) {
+    throw "Managed saved theme metadata must be an object: $themePath"
+  }
+  if ($theme.PSObject.Properties['schemaVersion']) { return $false }
+  $idProperty = $theme.PSObject.Properties['id']
+  $directoryName = [System.IO.Path]::GetFileName($directory)
+  if ($null -eq $idProperty -or $idProperty.Value -isnot [string] -or
+    $idProperty.Value -cnotmatch '^[0-9]{8}-[0-9]{6}-[0-9a-f]{8}$' -or
+    $directoryName -cne $idProperty.Value) {
+    return $false
+  }
+  $legacyProperties = [System.Collections.Generic.HashSet[string]]::new(
+    [System.StringComparer]::Ordinal
+  )
+  foreach ($name in @('id', 'name', 'image', 'appearance', 'art')) {
+    $null = $legacyProperties.Add($name)
+    if (-not $theme.PSObject.Properties[$name]) { return $false }
+  }
+  foreach ($property in $theme.PSObject.Properties) {
+    if (-not $legacyProperties.Contains($property.Name)) { return $false }
+  }
+  $imageProperty = $theme.PSObject.Properties['image']
+  if ($null -eq $imageProperty -or $imageProperty.Value -isnot [string]) { return $false }
+  $image = [string]$imageProperty.Value
+  if ([System.IO.Path]::GetFileName($image) -cne $image -or
+    $image -cnotmatch '^art\.(?:png|jpe?g|webp)$') {
+    return $false
+  }
+  $imagePath = [System.IO.Path]::GetFullPath((Join-Path $directory $image))
+  if (-not (Test-DreamSkinThemePathWithin -Path $imagePath -Root $directory) -or
+    -not (Test-Path -LiteralPath $imagePath -PathType Leaf)) {
+    return $false
+  }
+  $allowed = [System.Collections.Generic.HashSet[string]]::new(
+    [System.StringComparer]::Ordinal
+  )
+  foreach ($name in @('theme.json', $image, 'theme.css')) { $null = $allowed.Add($name) }
+  foreach ($entry in Get-ChildItem -LiteralPath $directory -Force -ErrorAction Stop) {
+    Assert-DreamSkinNoReparseComponents -Path $entry.FullName
+    if ($entry.PSIsContainer -or -not $allowed.Contains($entry.Name)) { return $false }
+  }
+  Assert-DreamSkinNoReparseComponents -Path $imagePath
+  Assert-DreamSkinImageFile -Path $imagePath
+  $cssPath = Join-Path $directory 'theme.css'
+  if (Test-Path -LiteralPath $cssPath -PathType Leaf) {
+    Assert-DreamSkinSafeCssFile -Path $cssPath
+  }
   $theme | Add-Member -NotePropertyName schemaVersion -NotePropertyValue 1
   Write-DreamSkinUtf8FileAtomically -Path $themePath `
     -Content (($theme | ConvertTo-Json -Depth 8) + "`r`n")
@@ -2240,17 +2321,54 @@ function Use-DreamSkinSavedTheme {
   $paths = Get-DreamSkinThemePaths -StateRoot $StateRoot
   Ensure-DreamSkinManagedDirectory -Path $paths.Root -Root $paths.Root
   Ensure-DreamSkinManagedDirectory -Path $paths.Saved -Root $paths.Root
-  $directory = [System.IO.Path]::GetFullPath($ThemeDirectory)
-  if (-not (Test-DreamSkinThemePathWithin -Path $directory -Root $paths.Saved)) {
-    throw 'Saved theme must remain inside the Dream Skin themes folder.'
+  $mutex = New-DreamSkinThemeImportMutex
+  $acquired = $false
+  try {
+    try { $acquired = $mutex.WaitOne(0) } catch [System.Threading.AbandonedMutexException] { $acquired = $true }
+    if (-not $acquired) {
+      throw 'Another theme import is still running; the saved theme cannot be selected safely.'
+    }
+    Repair-DreamSkinThemeReplacementTransactions -Paths $paths
+    $directory = [System.IO.Path]::GetFullPath($ThemeDirectory)
+    if (-not (Test-DreamSkinThemePathWithin -Path $directory -Root $paths.Saved)) {
+      throw 'Saved theme must remain inside the Dream Skin themes folder.'
+    }
+    $null = Update-DreamSkinLegacyManagedSavedThemeSchema `
+      -ThemeDirectory $directory -ManagedRoot $paths.Root
+    $saved = Read-DreamSkinTheme -ThemeDirectory $directory
+    $schemaProperty = $saved.Theme.PSObject.Properties['schemaVersion']
+    $schemaValue = if ($null -ne $schemaProperty) { $schemaProperty.Value } else { $null }
+    $numericSchema = $schemaValue -is [byte] -or $schemaValue -is [sbyte] -or
+      $schemaValue -is [int16] -or $schemaValue -is [uint16] -or
+      $schemaValue -is [int32] -or $schemaValue -is [uint32] -or
+      $schemaValue -is [int64] -or $schemaValue -is [uint64] -or
+      $schemaValue -is [single] -or $schemaValue -is [double] -or
+      $schemaValue -is [decimal]
+    if (-not $numericSchema -or [decimal]$schemaValue -ne [decimal]1) {
+      throw 'Saved theme must use numeric theme schemaVersion 1.'
+    }
+    $safeCssPath = Join-Path $directory 'theme.css'
+    if (-not (Test-Path -LiteralPath $safeCssPath -PathType Leaf)) { $safeCssPath = $null }
+    if ($safeCssPath) { Assert-DreamSkinSafeCssFile -Path $safeCssPath }
+    if (-not (Get-Command Get-DreamSkinNodeRuntime -ErrorAction SilentlyContinue)) {
+      throw 'Node.js runtime validation is unavailable for saved theme checks.'
+    }
+    $node = Get-DreamSkinNodeRuntime
+    $injector = Join-Path $PSScriptRoot 'injector.mjs'
+    if (-not (Test-Path -LiteralPath $injector -PathType Leaf)) {
+      throw 'Saved theme payload validator is missing from the runtime engine.'
+    }
+    $payloadCheck = @(& $node.Path $injector '--check-payload' '--theme-dir' $directory 2>&1)
+    if ($LASTEXITCODE -ne 0) {
+      throw 'Saved theme failed the schema, image, or runtime payload contract.'
+    }
+    $theme = $saved.Theme | ConvertTo-Json -Depth 8 | ConvertFrom-Json
+    return Set-DreamSkinActiveTheme -ImagePath $saved.ImagePath -Theme $theme `
+      -SafeCssPath $safeCssPath -StateRoot $StateRoot
+  } finally {
+    if ($acquired) { try { $mutex.ReleaseMutex() } catch {} }
+    $mutex.Dispose()
   }
-  $saved = Read-DreamSkinTheme -ThemeDirectory $directory
-  $theme = $saved.Theme | ConvertTo-Json -Depth 8 | ConvertFrom-Json
-  $safeCssPath = Join-Path $directory 'theme.css'
-  if (-not (Test-Path -LiteralPath $safeCssPath -PathType Leaf)) { $safeCssPath = $null }
-  if ($safeCssPath) { Assert-DreamSkinSafeCssFile -Path $safeCssPath }
-  return Set-DreamSkinActiveTheme -ImagePath $saved.ImagePath -Theme $theme `
-    -SafeCssPath $safeCssPath -StateRoot $StateRoot
 }
 
 function Set-DreamSkinPaused {

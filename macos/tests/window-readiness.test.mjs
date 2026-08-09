@@ -111,6 +111,19 @@ assert.equal(
   true,
   "Intentional Internet Angel accent labels must not fail otherwise complete home-card coverage.",
 );
+assert.equal(
+  assessRendererVerification({
+    ...angelRenderer,
+    scope: { level: "L1", baseState: "home", missingL1: [] },
+    angelSurfacePass: true,
+    angelDeckReady: false,
+    homeRoute: false,
+    homePresent: true,
+    hero: { visible: true, width: 900, height: 620 },
+  }, readyNativeWindow, angelPayload).pass,
+  false,
+  "Scope or a visible Home container must keep the Internet Angel deck gate fail closed.",
+);
 
 // Codex 26.721.x sometimes renders game-source/home suggestions before
 // home-icon. In that interval homeRoute is already a real [role=main], so

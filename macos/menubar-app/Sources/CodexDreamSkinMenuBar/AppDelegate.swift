@@ -32,6 +32,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, UNUser
   private var updateCheckTimer: Timer?
   private var availableUpdate: (version: String, releaseURL: String)?
   private var updateCheckInFlight = false
+  private let canonicalReleaseURL =
+    "https://github.com/EmiyaKatuz/Codex-Dream-Skin-Needy-Girl-Overdose/releases/latest"
   private lazy var communityHTTP = BoundedCommunityHTTPClient(
     userAgent: "CodexDreamSkin/\(appVersion)"
   )
@@ -1080,7 +1082,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, UNUser
         alert.addButton(withTitle: "稍后")
         self.activateForUserInteraction()
         if alert.runModal() == .alertFirstButtonReturn,
-           let url = URL(string: "https://github.com/EmiyaKatuz/Codex-Dream-Skin/releases/latest") {
+           let url = URL(string: self.canonicalReleaseURL) {
           NSWorkspace.shared.open(url)
         }
       } else {
@@ -1116,8 +1118,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, UNUser
         self.rebuildMenu()
         return
       }
-      let releaseURL = (value["releaseUrl"] as? String)
-        ?? "https://github.com/EmiyaKatuz/Codex-Dream-Skin/releases/latest"
+      // Installed engines from before v1.5.14 can still report the obsolete
+      // short repository alias. Treat the helper as version data only and pin
+      // every user-facing download action to this fork's canonical Release.
+      let releaseURL = self.canonicalReleaseURL
       self.availableUpdate = (version: latest, releaseURL: releaseURL)
       self.rebuildMenu()
       let lastNotifiedKey = "lastNotifiedUpdateVersion"
@@ -1142,8 +1146,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, UNUser
   }
 
   @objc private func openAvailableUpdate() {
-    guard let url = URL(string: availableUpdate?.releaseURL
-      ?? "https://github.com/EmiyaKatuz/Codex-Dream-Skin/releases/latest") else { return }
+    guard let url = URL(string: canonicalReleaseURL) else { return }
     NSWorkspace.shared.open(url)
   }
 
@@ -1160,8 +1163,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, UNUser
     didReceive response: UNNotificationResponse,
     withCompletionHandler completionHandler: @escaping () -> Void
   ) {
-    if let urlString = response.notification.request.content.userInfo["releaseURL"] as? String,
-       let url = URL(string: urlString) {
+    if let url = URL(string: canonicalReleaseURL) {
       NSWorkspace.shared.open(url)
     }
     completionHandler()
