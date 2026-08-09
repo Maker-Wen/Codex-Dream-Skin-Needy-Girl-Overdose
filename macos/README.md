@@ -16,7 +16,7 @@ This project injects through **local loopback CDP**. It does **not** modify the 
 
 ## Release install (recommended)
 
-普通用户请从 [GitHub Releases](https://github.com/EmiyaKatuz/Codex-Dream-Skin/releases) 下载
+普通用户请从 [GitHub Releases](https://github.com/EmiyaKatuz/Codex-Dream-Skin-Needy-Girl-Overdose/releases) 下载
 `CodexDreamSkin-vX.Y.Z.dmg`，按 [`docs/install-macos.md`](../docs/install-macos.md) 的图形界面步骤
 拖入 Applications。首次运行可能需要在“系统设置 → 隐私与安全性 → 仍要打开”确认一次；不需要
 运行 `xattr` 或安装源码。后续更新下载新的 DMG 覆盖安装即可，用户主题和图片会保留。
@@ -84,7 +84,11 @@ Do not ship only CSS/images.
 8. Config backup/restore requires Codex to be closed, strict UTF-8, an operation
    lock, same-directory atomic replacement, and an unchanged-byte check.
 
-CDP is powerful and unauthenticated on loopback. Prefer Restore when you are done theming.
+CDP is powerful and unauthenticated on loopback. Another process on the same
+computer may connect while the CDP-enabled Codex process is running. Removing
+the CSS or stopping only the injector does not remove the debug-port launch
+argument; use Restore with `--restart-codex`, or fully quit Codex and reopen it
+normally, to end the exposure window. See [`../SECURITY.md`](../SECURITY.md).
 
 ## Bundled presets
 

@@ -113,24 +113,32 @@ jobs:
         run: |
           expected="$(tr -d '\r\n' < macos/VERSION)"
           windows_version="$(tr -d '\r\n' < windows/VERSION)"
+          linux_version="$(tr -d '\r\n' < linux/VERSION)"
           package_version="$(node -p "JSON.parse(require('fs').readFileSync('macos/package.json','utf8')).version")"
           common="$(sed -n 's/^SKIN_VERSION="\([^"]*\)"$/\1/p' macos/scripts/common-macos.sh)"
+          linux_common="$(sed -n 's/^SKIN_VERSION="\([^"]*\)"$/\1/p' linux/scripts/common-linux.sh)"
           macos_injector="$(sed -n 's/^const SKIN_VERSION = "\([^"]*\)";$/\1/p' macos/scripts/injector.mjs)"
           windows_injector="$(sed -n 's/^const SKIN_VERSION = "\([^"]*\)";$/\1/p' windows/scripts/injector.mjs)"
+          linux_injector="$(sed -n 's/^const SKIN_VERSION = "\([^"]*\)";$/\1/p' linux/scripts/injector.mjs)"
           test -n "$expected"
           test "$windows_version" = "$expected"
+          test "$linux_version" = "$expected"
           test "$package_version" = "$expected"
           test "$common" = "$expected"
+          test "$linux_common" = "$expected"
           test "$macos_injector" = "$expected"
           test "$windows_injector" = "$expected"
+          test "$linux_injector" = "$expected"
 
       - name: Run portable Node.js regressions
         shell: bash
         run: |
           node --test macos/tests/*.test.mjs
           node --test windows/tests/*.test.mjs
+          node --test tools/*.test.mjs
           node macos/scripts/injector.mjs --check-payload >/dev/null
           node windows/scripts/injector.mjs --check-payload >/dev/null
+          node linux/scripts/injector.mjs --check-payload >/dev/null
 
   windows-tests:
     name: Windows (${{ matrix.name }})

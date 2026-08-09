@@ -19,7 +19,7 @@ Codex Dream Skin 通过本机回环 CDP 给官方 Codex Windows 桌面应用加�
 
 ## Release 安装（推荐普通用户）
 
-普通用户请从 [GitHub Releases](https://github.com/EmiyaKatuz/Codex-Dream-Skin/releases) 下载
+普通用户请从 [GitHub Releases](https://github.com/EmiyaKatuz/Codex-Dream-Skin-Needy-Girl-Overdose/releases) 下载
 `CodexDreamSkin-Setup-vX.Y.Z.exe`，按 [`docs/install-windows.md`](../docs/install-windows.md) 的图形
 界面步骤安装。安装器自带固定 Node 运行时，不需要 clone 仓库或运行 `.ps1`；默认按当前用户安装，
 不应要求管理员权限。未签名的新下载偶尔会触发 SmartScreen，按“更多信息 → 仍要运行”即可，
@@ -230,13 +230,15 @@ Issue #235 的实机结果已经确认两种独立失败：`26.715.10079.0` 的 
 
 重新运行安装器和启动快捷方式。脚本会重新发现当前注册的 Store 包，不依赖旧版本的可执行文件路径。
 
-提交问题时请从仓库的 [Issue 提交页](https://github.com/EmiyaKatuz/Codex-Dream-Skin/issues/new/choose) 选择 Bug 模板，附上系统版本、Codex 来源、复现步骤和相关日志片段。请删除密钥、`auth.json`、中转 token 和私人对话内容。
+提交问题时请从仓库的 [Issue 提交页](https://github.com/EmiyaKatuz/Codex-Dream-Skin-Needy-Girl-Overdose/issues/new/choose) 选择 Bug 模板，附上系统版本、Codex 来源、复现步骤和相关日志片段。请删除密钥、`auth.json`、中转 token 和私人对话内容。
 
 ## 安全边界
 
-- CDP 只绑定 `127.0.0.1`。皮肤运行期间不要运行来路不明的本机程序。
+- CDP 只绑定 `127.0.0.1`，但没有身份认证；同一台电脑上的其他进程仍可能连接并读取或控制 renderer。
+- 暂停主题或只停止 injector 不会关闭正在运行的 Codex 调试端口；执行带重启的完整恢复，或退出全部 Codex 后从官方普通入口重新打开，风险窗口才结束。
 - 不修改官方 Codex 安装目录、WindowsApps、`app.asar` 或签名。
 - 不写入 API Key、Base URL 或模型供应商配置。
 - 恢复脚本只会控制经过包身份、进程路径和会话状态校验的 Codex 进程。
+- 完整威胁模型与操作建议见 [`../SECURITY.md`](../SECURITY.md)。
 
 维护者和代理使用的实现约束见 [`SKILL.md`](./SKILL.md)，运行时排错细节见 [`references/runtime-notes.md`](./references/runtime-notes.md)。

@@ -57,6 +57,7 @@ foreach ($requiredDefinition in @(
   'PrivilegesRequired=lowest',
   'ArchitecturesAllowed=x64compatible',
   'ChangesAssociations=yes',
+  'AppUpdatesURL=https://github.com/EmiyaKatuz/Codex-Dream-Skin-Needy-Girl-Overdose/releases',
   'OutputBaseFilename=CodexDreamSkin-Setup-v{#AppVersion}',
   'Source: "{#StageRoot}\payload\*"',
   'DestDir: "{app}\payload"',

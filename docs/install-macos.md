@@ -6,7 +6,7 @@
 
 先安装官方 ChatGPT / Codex 桌面应用，至少启动一次后退出，让它创建本机配置文件。
 
-1. 在 GitHub 的 [Releases](https://github.com/EmiyaKatuz/Codex-Dream-Skin/releases) 下载最新的
+1. 在 GitHub 的 [Releases](https://github.com/EmiyaKatuz/Codex-Dream-Skin-Needy-Girl-Overdose/releases) 下载最新的
    `CodexDreamSkin-vX.Y.Z.dmg`。`SHA256SUMS.txt` 是可选的完整性校验文件。
 2. 双击 DMG，把 **Codex Dream Skin.app** 拖到 **Applications（应用程序）**。
 3. 第一次打开时，macOS 可能提示应用来自无法验证的开发者。这是因为公开发行包目前没有
@@ -77,8 +77,10 @@ Codex/ChatGPT 界面报告目标主题已经渲染。第一次切换前，客户
 再次触发 Gatekeeper；这是 macOS 按文件和来源作出的安全判断，项目无法保证所有系统版本都只
 提示一次。若出现提示，重复上面的“隐私与安全性 → 仍要打开”即可，不需要重新安装引擎。
 
-菜单栏中的“检查更新”只在用户点击时访问 GitHub Releases，不会后台轮询，
-也不会静默下载或替换应用。
+菜单栏会每 24 小时在后台静默访问一次 GitHub Releases（启动后约 15 秒先查一次），
+发现新版本时推送一条系统通知并在菜单里显示「🆕 发现新版本」；「维护」子菜单里的
+「立即检查更新」可随时手动触发。两种方式都只做检查和跳转下载页，不会静默下载或
+替换应用。
 
 ## 卸载
 

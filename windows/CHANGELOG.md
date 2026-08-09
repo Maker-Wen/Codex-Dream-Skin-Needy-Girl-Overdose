@@ -1,5 +1,23 @@
 # Windows Changelog
 
+## 1.5.14 — 2026-08-09
+
+### 更新
+
+- 同步上游 `main@6f789be` 的安全、主题合同、macOS 菜单与验证改进，同时保留本仓库的 INTERNET ANGEL 三端运行时、Issue #14/#16 修复、Win32 原生窗口证据、Windows Acrylic 与 Linux 支持。
+- Windows、macOS 与 Linux 的运行时版本统一提升到 1.5.14。
+
+### 修复
+
+- 主题包 manifest 时间戳现在严格校验 RFC 3339；Windows 路径校验允许合法的点前缀文件名，同时继续拒绝真正的 `..` 穿越。
+- Windows 主题运行时强制要求 `schemaVersion: 1`，并只对受管 `active-theme` 中由 v1.5.13 生成、缺少 schema 的 `id=custom` 主题执行有界迁移；外部 ZIP、未知 ID 和未来 schema 仍按新合同失败关闭。
+- 共享图片元数据实现重新同步到双平台；macOS 在调用 `sips` 前先执行有界尺寸预检，且正式 App/DMG 包含并验收该辅助脚本。
+- macOS 渲染器补充可见性与视口检查，菜单栏重新应用优先热重载，「打开 ChatGPT」保留本仓库的原生打开/聚焦语义；菜单分组与后台更新通知同步纳入发布。
+
+### 内部
+
+- 根目录补充 MIT `LICENSE` 与 CDP 回环风险说明 `SECURITY.md`；CI 和 Release 检查新增共享 runtime 与 tools 测试覆盖。
+
 ## 1.5.13 — 2026-08-09
 
 ### 更新

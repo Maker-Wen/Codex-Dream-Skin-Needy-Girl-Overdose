@@ -39,7 +39,11 @@ const stableTestidLiteral = (testid) => {
   }
   return JSON.stringify(`[data-testid="${testid}"]`);
 };
-const SKIN_VERSION = "1.5.13";
+const SKIN_VERSION = "1.5.14";
+// .github/workflows/ci.yml's version-consistency check greps this file for a
+// literal `const SKIN_VERSION = "...";` line, so the export stays a separate
+// statement rather than an inline `export const`.
+export { SKIN_VERSION };
 const INTERNET_ANGEL_EXTENSION_THEME_IDS = new Set([
   "preset-internet-angel",
   "preset-internet-angel-default",
@@ -650,6 +654,13 @@ function sameFileStat(left, right) {
     && left.ctimeMs === right.ctimeMs;
 }
 
+function isContainedRelativePath(relativePath) {
+  return relativePath !== ""
+    && !path.isAbsolute(relativePath)
+    && relativePath !== ".."
+    && !relativePath.startsWith(`..${path.sep}`);
+}
+
 async function loadSafeCss(themeRoot) {
   const cssPath = path.join(themeRoot, "theme.css");
   let handle;
@@ -685,11 +696,14 @@ export async function loadTheme(themeDir) {
   if (!raw || typeof raw !== "object" || Array.isArray(raw)) {
     throw new Error("Theme root must be an object");
   }
+  if (raw.schemaVersion !== 1) {
+    throw new Error("Theme must use schemaVersion 1");
+  }
   const image = normalizedText(raw.image, "image", null, 240);
   if (!image || path.isAbsolute(image)) throw new Error("Theme image must be a relative path");
   const imagePath = path.resolve(realThemeDir, image);
   const relativeImage = path.relative(realThemeDir, imagePath);
-  if (!relativeImage || relativeImage.startsWith("..") || path.isAbsolute(relativeImage)) {
+  if (!isContainedRelativePath(relativeImage)) {
     throw new Error("Theme image must remain inside the selected theme directory");
   }
   const extension = path.extname(imagePath).toLowerCase();
@@ -698,7 +712,7 @@ export async function loadTheme(themeDir) {
   }
   const realImagePath = await fs.realpath(imagePath);
   const realRelativeImage = path.relative(realThemeDir, realImagePath);
-  if (!realRelativeImage || realRelativeImage.startsWith("..") || path.isAbsolute(realRelativeImage)) {
+  if (!isContainedRelativePath(realRelativeImage)) {
     throw new Error("Theme image cannot escape through a link or junction");
   }
   const art = raw.art && typeof raw.art === "object" && !Array.isArray(raw.art) ? raw.art : {};
@@ -728,6 +742,7 @@ export async function loadTheme(themeDir) {
       Object.hasOwn(rawColors, key) || (key === "accent" && legacyAccent !== null))
     : (legacyAccent !== null ? ["accent"] : []);
   const theme = {
+    schemaVersion: 1,
     id: normalizeThemeText(raw.id, "custom", 80, "id", themePath),
     name: normalizeThemeText(raw.name, "Codex Dream Skin", 80, "name", themePath),
     brandSubtitle: normalizeThemeText(raw.brandSubtitle, "CODEX DREAM SKIN", 120, "brandSubtitle", themePath),

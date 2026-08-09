@@ -2,7 +2,82 @@
 
 Updated: 2026-08-09 CST (Asia/Shanghai)
 
+## v1.5.14 upstream sync and release
+
+- [goal] Merge the latest upstream `main` into the fork with fork behavior and
+  branding taking precedence, raise all platform sources to 1.5.14, run only
+  basic local verification, then publish and verify the immutable Release.
+- [workspace] Isolated worktree
+  `C:\Users\19110\AppData\Local\Temp\codex-dream-skin-v1.5.14-019fdc7d` on
+  branch `codex/sync-upstream-v1.5.14`. The primary worktree's user changes to
+  `.gitignore`, `TASK_PROGRESS.md`, and `.codegraph/` remain untouched.
+- [inputs] Exact fork base `origin/main@ed86e3b5af8d429f884fe9edc6311f4ccd85933e`
+  and upstream head `upstream/main@6f789be4570b1d5c9e7e60545f22173195968720`;
+  merge base is `0a727a539fc9cd298ad4827c6cefbd4a2192db79`.
+- [recovery] Direct git transport to `github.com:443` was unavailable. The
+  signed GitHub API commit payloads plus every reachable tree and blob were
+  imported with exact SHA verification; both local remote-tracking refs were
+  updated only after their current server heads and complete object graphs
+  matched.
+- [merge] The non-fast-forward merge conflicts are resolved. Fork workflows, release
+  invariants, download URLs, INTERNET ANGEL extensions, Issue #14/#16 behavior,
+  Win32 readiness evidence, Acrylic and Linux coverage take precedence. Safe
+  upstream timestamp/path/schema checks, shared image metadata, macOS menu and
+  visibility fixes, root LICENSE/SECURITY, and tools CI coverage are retained.
+- [complete] The macOS dimension helper is now present in the App integrity
+  list, runtime packaging whitelist, mounted-DMG verification and standalone
+  menu upgrade path. Fork update fallbacks remain on the fork, native Open
+  ChatGPT behavior is preserved, and the image shell accepts writer task mode
+  `full`.
+- [complete] Windows migrates only the exact managed v1.5.13 shapes: Active
+  themes may use `id=custom` or the strict timestamp ID with the generated
+  Active image name; dormant Saved themes are migrated only when explicitly
+  selected, under the import mutex, from a direct timestamp-ID child with the
+  exact legacy property/file set. The migrated theme passes canonical Node
+  payload validation before Active is written. Future/string schemas,
+  mismatched IDs, unknown files and external packages remain fail closed.
+- [verified] Current basic local checks pass: PowerShell parsing; Git Bash
+  syntax; renderer verification 6/6 including hidden-signal Home fail-closed;
+  direct host Home/deck fail-closed; Windows schema/path 4/4; installer-static
+  in PowerShell 7 and 5.1; functional managed Active and Saved v1.5.13
+  migration; shared runtime sync; all three platform payload checks;
+  nine-source 1.5.14 consistency; and diff whitespace.
+- [scope] Per user direction, no real Codex smoke or complete local platform
+  suite is being run. Native Swift/DMG, Setup.exe and full platform suites stay
+  mandatory exact-head GitHub CI/Release workflow gates.
+- [reviewed] The complete 46-file merge diff is staged and reviewed. Script
+  modes remain executable, no upstream release/download URL replaced the fork,
+  the macOS dimension helper is included in both full and standalone packaging,
+  and the shared validator copies are byte-identical.
+- [ci follow-up] Merge commit `450b9148` and assertion commit `17659ce` are on
+  PR #25. The exact `17659ce` head passed Static checks, macOS regressions,
+  Windows PowerShell 5.1 and Windows PowerShell 7. Automated review then found
+  five actionable gaps. The stale assertion was already fixed; local follow-up
+  now also fixes the managed timestamp/Saved migration, canonical long fork
+  update URLs, Home/INTERNET ANGEL deck fail-open, and standalone macOS menu
+  upgrades that could publish a new loader before its helpers.
+- [reviewed] The standalone menu upgrade now preflights every coupled source,
+  clones the complete installed engine into a private same-parent directory,
+  byte-verifies the menu template, six shell scripts and three Node helpers,
+  publishes with directory renames, atomically replaces the active SwiftBar
+  plugin, and restores both plugin and engine on caught failure. A macOS
+  transaction fixture covers success from a v1.5.13-shaped engine and missing
+  helper failure before live mutation; exact-head macOS CI will execute it.
+- [ci follow-up] Exact `b0644a2` Static and macOS jobs passed, including the new
+  menu transaction fixture. Both Windows hosts deterministically reached the
+  existing saved-theme count assertion and failed because the new migration
+  fixtures were left in the shared test store. The fixture directories are now
+  removed after their assertions; production behavior was not implicated.
+- [pending] Commit and push the review follow-up, require the new exact-head CI,
+  reply to and resolve all five review threads, merge, then verify tag, public
+  Release, DMG, Setup.exe and SHA256SUMS.txt.
+
 ## v1.5.13 Issue #14/#16 completion and release
+
+- [historical complete] PR #23 was subsequently merged as
+  `ed86e3b5af8d429f884fe9edc6311f4ccd85933e`; public v1.5.13 was released with
+  the required assets, and Issues #14/#16 were replied to and closed. The
+  remaining bullets preserve the pre-publication evidence trail.
 
 - [goal] Resolve the remaining PR #23 CI/review defects, finish and verify
   Issue #14 and #16 on the exact release candidate, merge only after fresh CI
@@ -15,7 +90,7 @@ Updated: 2026-08-09 CST (Asia/Shanghai)
   sessions, including all uncommitted files. Its branch remained at `18e51bb`;
   a fresh isolated worktree was created from that exact commit and the audited
   fixes are being rebuilt from the recorded findings and test evidence.
-- [remote] On 2026-08-09, PR #23 remains open at `18e51bb` with the original
+- [historical baseline] At the start of that work, PR #23 was open at `18e51bb` with the original
   PowerShell 7 contention-test failure and review required. Issues #14 and #16
   remain open. The latest public Release remains v1.5.12.
 - [diagnosed] Issue #14 still needs visible Home-signal selection, responsive
@@ -60,9 +135,9 @@ Updated: 2026-08-09 CST (Asia/Shanghai)
   intentionally left to exact-head macOS CI. Native Swift/DMG and signed Setup
   build validation, release asset checksums, and real Codex smoke remain release
   gates and are not claimed locally.
-- [pending] Stage and commit the reviewed diff, update PR #23, require fresh
-  exact-head CI and approval, merge, verify the public v1.5.13 tag and all three
-  immutable assets, then comment on and close Issues #14/#16.
+- [complete] The reviewed diff was committed and pushed, exact-head CI passed,
+  PR #23 merged, the v1.5.13 tag and three immutable assets were verified, and
+  Issues #14/#16 were commented on and closed.
 
 Updated: 2026-08-07 CST (Asia/Shanghai)
 

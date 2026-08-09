@@ -43,7 +43,11 @@ const stableTestidLiteral = (testid) => {
   }
   return JSON.stringify(`[data-testid="${testid}"]`);
 };
-const SKIN_VERSION = "1.5.13";
+const SKIN_VERSION = "1.5.14";
+// .github/workflows/ci.yml's version-consistency check greps this file for a
+// literal `const SKIN_VERSION = "...";` line, so the export stays a separate
+// statement rather than an inline `export const`.
+export { SKIN_VERSION };
 const INTERNET_ANGEL_EXTENSION_THEME_IDS = new Set([
   "preset-internet-angel",
   "preset-internet-angel-default",
@@ -257,7 +261,7 @@ export function assessRendererVerification(renderer, nativeWindow, expected) {
     result.themeId || expected.expectedThemeId || "",
   ).trim());
   const angelSurfacePass = !angelThemeExpected || result.angelSurfacePass === true;
-  const angelDeckPass = !result.homeRoute
+  const angelDeckPass = !homeRoute
     || !angelThemeExpected
     || result.angelDeckReady;
   const visibleSuggestionLabels = Array.isArray(result.suggestionLabels)
@@ -1175,27 +1179,49 @@ export async function inspectNativeWindow(session) {
   }
 }
 
-async function verifySession(session, expectedThemeId = null, expectedRevision = null) {
+export async function verifySession(session, expectedThemeId = null, expectedRevision = null) {
   const renderer = await session.evaluate(`(() => {
     const box = (node) => {
       if (!node) return null;
       const r = node.getBoundingClientRect();
       const style = getComputedStyle(node);
+      const opacity = Number.parseFloat(style.opacity);
+      const right = Number.isFinite(r.right) ? r.right : r.x + r.width;
+      const bottom = Number.isFinite(r.bottom) ? r.bottom : r.y + r.height;
+      let cssVisible = r.width > 0 && r.height > 0 && style.display !== 'none' &&
+        style.visibility !== 'hidden' && style.visibility !== 'collapse' &&
+        style.contentVisibility !== 'hidden' && (!Number.isFinite(opacity) || opacity > .05);
+      try {
+        if (typeof node.checkVisibility === 'function') {
+          cssVisible = cssVisible && node.checkVisibility({
+            checkOpacity: true,
+            checkVisibilityCSS: true,
+          });
+        }
+      } catch {}
+      const intersectsViewport = right > 0 && bottom > 0 && r.x < innerWidth && r.y < innerHeight;
       return {
         x: Math.round(r.x), y: Math.round(r.y),
         width: Math.round(r.width), height: Math.round(r.height),
-        visible: r.width > 0 && r.height > 0 && style.display !== 'none' && style.visibility !== 'hidden',
+        visible: Boolean(node.isConnected !== false && cssVisible && intersectsViewport),
       };
     };
-    const homeIndicator = document.querySelector(${selectorLiteral("home-icon")});
-    const homeSignal = homeIndicator ?? document.querySelector(${selectorLiteral("game-source")}) ??
-      document.querySelector(${selectorLiteral("home-suggestions")});
+    const queryAll = (selector, root = document) => {
+      try { return [...root.querySelectorAll(selector)]; } catch { return []; }
+    };
+    const firstVisible = (nodes) => nodes.find((node) => box(node)?.visible) ?? null;
+    const homeSignal = firstVisible([
+      ...queryAll(${selectorLiteral("home-icon")}),
+      ...queryAll(${selectorLiteral("game-source")}),
+      ...queryAll(${selectorLiteral("home-suggestions")}),
+    ]);
     const homeRoute = homeSignal?.closest('[role="main"]') ?? null;
     // Codex 26.721.x can render the home content before home-icon. Reuse the
     // already-resolved semantic home container so a healthy home session is
     // not rejected solely because the stricter home-icon selector is late.
-    const home = document.querySelector(${selectorLiteral("home-route")}) ?? homeRoute;
-    const suggestions = home?.querySelector(${selectorLiteral("home-suggestions")}) ?? null;
+    const home = firstVisible(queryAll(${selectorLiteral("home-route")})) ??
+      (box(homeRoute)?.visible ? homeRoute : null);
+    const suggestions = home ? firstVisible(queryAll(${selectorLiteral("home-suggestions")}, home)) : null;
     const angelDeck = home?.querySelector('#chatgpt-internet-angel-deck[data-angel-ready="true"]') ?? null;
     const angelCards = angelDeck ? [...angelDeck.querySelectorAll('button.angel-preset-card')] : [];
     const cardButtons = angelCards.length ? angelCards : (suggestions ? [...suggestions.querySelectorAll('button')] : []);
@@ -1243,10 +1269,10 @@ async function verifySession(session, expectedThemeId = null, expectedRevision =
       ?? siblingCandidates.find((item) => item?.visible)
       ?? box(boxableChain[boxableChain.length - 1]);
     const projectButton = box(home?.querySelector(${selectorLiteral("project-selector")} + " > button"));
-    const shell = box(document.querySelector(${selectorLiteral("shell-main")}));
-    const composerNode = document.querySelector(${selectorLiteral("composer-chrome")});
+    const shell = box(firstVisible(queryAll(${selectorLiteral("shell-main")})));
+    const composerNode = firstVisible(queryAll(${selectorLiteral("composer-chrome")}));
     const composer = box(composerNode);
-    const sidebarNode = document.querySelector(${selectorLiteral("left-panel")});
+    const sidebarNode = firstVisible(queryAll(${selectorLiteral("left-panel")}));
     const sidebar = box(sidebarNode);
     const styleProbe = (node) => {
       if (!node) return null;
@@ -1261,12 +1287,12 @@ async function verifySession(session, expectedThemeId = null, expectedRevision =
         outlineWidth: style.outlineWidth,
       };
     };
-    const genericMain = box(document.querySelector('[data-ds-part="main"], [data-ds-part="home"]'));
-    const genericInput = box(document.querySelector('[data-ds-part="composer"]'));
+    const genericMain = box(firstVisible(queryAll('[data-ds-part="main"], [data-ds-part="home"]')));
+    const genericInput = box(firstVisible(queryAll('[data-ds-part="composer"]')));
     const settingsBoxes = [
-      box(document.querySelector(${selectorLiteral("settings-panel")})),
-      box(document.querySelector(${selectorLiteral("appearance-radio")})),
-      box(document.querySelector(${stableTestidLiteral("theme-preview")})),
+      ...queryAll(${selectorLiteral("settings-panel")}).map(box),
+      ...queryAll(${selectorLiteral("appearance-radio")}).map(box),
+      ...queryAll(${stableTestidLiteral("theme-preview")}).map(box),
     ];
     const settings = settingsBoxes.find((item) => item?.visible) ??
       settingsBoxes.find(Boolean) ?? null;
@@ -1330,7 +1356,7 @@ async function verifySession(session, expectedThemeId = null, expectedRevision =
       return candidateBox.x + candidateBox.width >= innerWidth - 64;
     }) ?? null;
     const environment = box(environmentNode);
-    const threadRoute = Boolean(document.querySelector('.thread-scroll-container')) && !homeRoute;
+    const threadRoute = Boolean(document.querySelector('.thread-scroll-container')) && !home;
     const runtime = window.__CODEX_DREAM_SKIN_STATE__;
     const adopted = runtime?.styleMode === 'adopted' &&
       [...document.adoptedStyleSheets].includes(runtime.styleSheet);
@@ -1348,7 +1374,7 @@ async function verifySession(session, expectedThemeId = null, expectedRevision =
       businessClassPollution: [...document.querySelectorAll('[class]')].filter((node) =>
         [...node.classList].some((name) => /^(?:dream-|codex-dream-skin(?:-|$))/.test(name))
       ).length,
-      homeRoute: Boolean(homeRoute),
+      homeRoute: Boolean(home),
       homePresent: Boolean(home),
       hero,
       cards: cardBoxes,
@@ -1416,7 +1442,7 @@ async function verifySession(session, expectedThemeId = null, expectedRevision =
     result.environmentInsideViewport = environmentInsideViewport;
     const payloadPass = (!expectedThemeId || result.themeId === expectedThemeId) &&
       (!expectedRevision || result.revision === expectedRevision);
-    const angelDeckPass = !homeRoute || !angelThemeExpected ||
+    const angelDeckPass = !result.homeRoute || !angelThemeExpected ||
       result.angelDeckReady;
     const composerAngelPass = !angelThemeExpected || !result.threadRoute || Boolean(
       result.composer?.visible && result.composerStyle?.component === 'composer' &&
@@ -1493,14 +1519,31 @@ async function verifySession(session, expectedThemeId = null, expectedRevision =
   });
 }
 
-async function waitForVerifiedSession(session, timeoutMs, expectedThemeId = null, expectedRevision = null) {
+export async function waitForVerifiedSession(
+  session,
+  timeoutMs,
+  expectedThemeId = null,
+  expectedRevision = null,
+  retryDelayMs = 500,
+) {
   const deadline = Date.now() + timeoutMs;
+  const retryDelay = Number.isFinite(retryDelayMs) && retryDelayMs >= 0 ? retryDelayMs : 500;
   let lastResult;
+  let lastError;
   while (Date.now() < deadline) {
-    lastResult = await verifySession(session, expectedThemeId, expectedRevision);
-    if (lastResult.pass) return lastResult;
-    await new Promise((resolve) => setTimeout(resolve, 500));
+    try {
+      lastResult = await verifySession(session, expectedThemeId, expectedRevision);
+      lastError = null;
+      if (lastResult.pass) return lastResult;
+    } catch (error) {
+      // Renderer navigations can invalidate Runtime.evaluate while Codex is
+      // swapping documents. Treat that as a transient sample until the same
+      // bounded verification deadline expires, matching the Windows injector.
+      lastError = error;
+    }
+    await new Promise((resolve) => setTimeout(resolve, retryDelay));
   }
+  if (!lastResult && lastError) throw lastError;
   return lastResult;
 }
 

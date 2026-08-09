@@ -4,11 +4,14 @@ import path from "node:path";
 import test from "node:test";
 import vm from "node:vm";
 import { fileURLToPath } from "node:url";
-import { verifySession } from "../scripts/injector.mjs";
+import { SKIN_VERSION, verifySession } from "../scripts/injector.mjs";
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const startPath = path.resolve(here, "../scripts/start-dream-skin.ps1");
 const expectedVersion = (await fs.readFile(path.resolve(here, "../VERSION"), "utf8")).trim();
+test("exported injector version matches VERSION", () => {
+  assert.equal(SKIN_VERSION, expectedVersion);
+});
 const win32WindowEvidence = {
   source: "win32-hwnd",
   processId: 4120,

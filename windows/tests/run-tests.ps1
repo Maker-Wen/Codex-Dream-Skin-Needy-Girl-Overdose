@@ -6,6 +6,13 @@ $Root = Split-Path -Parent $PSScriptRoot
 . (Join-Path $Root 'scripts\common-windows.ps1')
 . (Join-Path $Root 'scripts\theme-windows.ps1')
 
+$updateScript = [System.IO.File]::ReadAllText((Join-Path $Root 'scripts\check-update.ps1'))
+if (-not $updateScript.Contains(
+    "`$repository = 'EmiyaKatuz/Codex-Dream-Skin-Needy-Girl-Overdose'"
+  ) -or $updateScript.Contains("`$repository = 'EmiyaKatuz/Codex-Dream-Skin'")) {
+  throw 'Windows update checks must use this fork canonical GitHub repository.'
+}
+
 $temporaryRoot = Join-Path ([System.IO.Path]::GetTempPath()) "codex-dream-skin-tests-$PID-$([guid]::NewGuid().ToString('N'))"
 New-Item -ItemType Directory -Path $temporaryRoot | Out-Null
 
@@ -1085,6 +1092,172 @@ args = [
     throw 'Theme-store initialization overwrote the active custom theme or duplicated its bundled presets.'
   }
 
+  $legacyThemePath = Join-Path $themePaths.Active 'theme.json'
+  $legacyTheme = (Read-DreamSkinUtf8File -Path $legacyThemePath) | ConvertFrom-Json
+  $legacyTheme.PSObject.Properties.Remove('schemaVersion')
+  $legacyTheme.name = 'v1.5.13 legacy custom'
+  $legacyTheme.appearance = 'dark'
+  $legacyTheme.art.safeArea = 'right'
+  $legacyTheme.art.taskMode = 'ambient'
+  Write-DreamSkinUtf8FileAtomically -Path $legacyThemePath `
+    -Content (($legacyTheme | ConvertTo-Json -Depth 8) + "`r`n")
+  $legacyCssPath = Join-Path $themePaths.Active 'theme.css'
+  $legacyCss = '[data-ds-part="composer"] { color: #123456; }'
+  Write-DreamSkinUtf8FileAtomically -Path $legacyCssPath -Content ($legacyCss + "`r`n")
+  $legacyImagePath = Join-Path $themePaths.Active ([string]$legacyTheme.image)
+  $legacyImageHash = (Get-FileHash -LiteralPath $legacyImagePath -Algorithm SHA256).Hash
+  $legacyCssHash = (Get-FileHash -LiteralPath $legacyCssPath -Algorithm SHA256).Hash
+  $null = Initialize-DreamSkinThemeStore -SkillRoot $Root -StateRoot $themeStateRoot
+  $migratedTheme = (Read-DreamSkinUtf8File -Path $legacyThemePath) | ConvertFrom-Json
+  if ($migratedTheme.schemaVersion -ne 1 -or $migratedTheme.schemaVersion -is [string] -or
+    $migratedTheme.id -cne 'custom' -or $migratedTheme.name -cne 'v1.5.13 legacy custom' -or
+    $migratedTheme.appearance -cne 'dark' -or $migratedTheme.art.safeArea -cne 'right' -or
+    $migratedTheme.art.taskMode -cne 'ambient' -or
+    (Get-FileHash -LiteralPath $legacyImagePath -Algorithm SHA256).Hash -cne $legacyImageHash -or
+    (Get-FileHash -LiteralPath $legacyCssPath -Algorithm SHA256).Hash -cne $legacyCssHash) {
+    throw 'Legacy managed custom migration did not preserve the exact theme, image, and Safe CSS contract.'
+  }
+  $legacyPayload = Invoke-DreamSkinNative -FilePath $pathNode.Source -ArgumentList @(
+    (Join-Path $Root 'scripts\injector.mjs'), '--check-payload', '--theme-dir', $themePaths.Active)
+  if ($legacyPayload.ExitCode -ne 0) {
+    throw "Migrated legacy managed custom theme was rejected by the injector.`n$($legacyPayload.Output -join "`n")"
+  }
+
+  $legacyActiveTimestampId = '20260809-123456-a1b2c3d4'
+  $legacyTimestampTheme = (Read-DreamSkinUtf8File -Path $legacyThemePath) | ConvertFrom-Json
+  $legacyTimestampTheme.PSObject.Properties.Remove('schemaVersion')
+  $legacyTimestampTheme.id = $legacyActiveTimestampId
+  Write-DreamSkinUtf8FileAtomically -Path $legacyThemePath `
+    -Content (($legacyTimestampTheme | ConvertTo-Json -Depth 8) + "`r`n")
+  $null = Initialize-DreamSkinThemeStore -SkillRoot $Root -StateRoot $themeStateRoot
+  $migratedTimestampTheme = (Read-DreamSkinUtf8File -Path $legacyThemePath) | ConvertFrom-Json
+  if ($migratedTimestampTheme.schemaVersion -ne 1 -or
+    $migratedTimestampTheme.schemaVersion -is [string] -or
+    $migratedTimestampTheme.id -cne $legacyActiveTimestampId) {
+    throw 'Legacy timestamp-ID active theme was not migrated to numeric schemaVersion 1.'
+  }
+
+  $legacySavedId = '20260809-123457-b1c2d3e4'
+  $legacySavedDirectory = Join-Path $themePaths.Saved $legacySavedId
+  New-Item -ItemType Directory -Path $legacySavedDirectory -Force | Out-Null
+  $legacySavedImage = Join-Path $legacySavedDirectory 'art.jpg'
+  Copy-Item -LiteralPath (Join-Path $Root 'assets\dream-reference.jpg') `
+    -Destination $legacySavedImage -Force
+  $legacySavedThemePath = Join-Path $legacySavedDirectory 'theme.json'
+  $legacySavedTheme = [ordered]@{
+    id = $legacySavedId
+    name = 'v1.5.13 saved custom'
+    image = 'art.jpg'
+    appearance = 'dark'
+    art = [ordered]@{ focusX = $null; focusY = $null; safeArea = 'right'; taskMode = 'ambient' }
+  }
+  Write-DreamSkinUtf8FileAtomically -Path $legacySavedThemePath `
+    -Content (($legacySavedTheme | ConvertTo-Json -Depth 8) + "`r`n")
+  $legacySavedCssPath = Join-Path $legacySavedDirectory 'theme.css'
+  Write-DreamSkinUtf8FileAtomically -Path $legacySavedCssPath `
+    -Content ('[data-ds-part="composer"] { color: #654321; }' + "`r`n")
+  $legacySavedImageHash = (Get-FileHash -LiteralPath $legacySavedImage -Algorithm SHA256).Hash
+  $legacySavedCssHash = (Get-FileHash -LiteralPath $legacySavedCssPath -Algorithm SHA256).Hash
+  $selectedLegacySaved = Use-DreamSkinSavedTheme `
+    -ThemeDirectory $legacySavedDirectory -StateRoot $themeStateRoot
+  $migratedSavedTheme = (Read-DreamSkinUtf8File -Path $legacySavedThemePath) | ConvertFrom-Json
+  $selectedActiveTheme = (Read-DreamSkinUtf8File -Path $legacyThemePath) | ConvertFrom-Json
+  if ($migratedSavedTheme.schemaVersion -ne 1 -or $migratedSavedTheme.schemaVersion -is [string] -or
+    $selectedActiveTheme.schemaVersion -ne 1 -or $selectedActiveTheme.schemaVersion -is [string] -or
+    $migratedSavedTheme.id -cne $legacySavedId -or $selectedActiveTheme.id -cne $legacySavedId -or
+    $selectedLegacySaved.Theme.id -cne $legacySavedId -or
+    (Get-FileHash -LiteralPath $legacySavedImage -Algorithm SHA256).Hash -cne $legacySavedImageHash -or
+    (Get-FileHash -LiteralPath $legacySavedCssPath -Algorithm SHA256).Hash -cne $legacySavedCssHash) {
+    throw 'Legacy saved-theme migration did not preserve its ID, image, Safe CSS, and numeric schema.'
+  }
+  $legacySavedPayload = Invoke-DreamSkinNative -FilePath $pathNode.Source -ArgumentList @(
+    (Join-Path $Root 'scripts\injector.mjs'), '--check-payload', '--theme-dir', $themePaths.Active)
+  if ($legacySavedPayload.ExitCode -ne 0) {
+    throw "Selected legacy saved theme was rejected by the injector.`n$($legacySavedPayload.Output -join "`n")"
+  }
+
+  $activeBeforeInvalidSaved = Get-DreamSkinThemeRuntimeContentFingerprint `
+    -ThemeDirectory $themePaths.Active
+  foreach ($invalidSaved in @(
+    [pscustomobject]@{ Label = 'future schema'; Id = '20260809-123458-c1d2e3f4'; Schema = 2; IncludeSchema = $true; Extra = $false },
+    [pscustomobject]@{ Label = 'string schema'; Id = '20260809-123459-d1e2f3a4'; Schema = '1'; IncludeSchema = $true; Extra = $false },
+    [pscustomobject]@{ Label = 'mismatched id'; Id = 'not-the-directory-id'; Schema = $null; IncludeSchema = $false; Extra = $false },
+    [pscustomobject]@{ Label = 'unexpected file'; Id = '20260809-123501-f1a2b3c4'; Schema = $null; IncludeSchema = $false; Extra = $true }
+  )) {
+    $directoryId = if ($invalidSaved.Label -ceq 'mismatched id') {
+      '20260809-123500-e1f2a3b4'
+    } else { $invalidSaved.Id }
+    $invalidSavedDirectory = Join-Path $themePaths.Saved $directoryId
+    New-Item -ItemType Directory -Path $invalidSavedDirectory -Force | Out-Null
+    Copy-Item -LiteralPath (Join-Path $Root 'assets\dream-reference.jpg') `
+      -Destination (Join-Path $invalidSavedDirectory 'art.jpg') -Force
+    $invalidSavedTheme = [ordered]@{
+      id = $invalidSaved.Id
+      name = $invalidSaved.Label
+      image = 'art.jpg'
+      appearance = 'auto'
+      art = [ordered]@{ focusX = $null; focusY = $null; safeArea = 'auto'; taskMode = 'auto' }
+    }
+    if ($invalidSaved.IncludeSchema) { $invalidSavedTheme.schemaVersion = $invalidSaved.Schema }
+    $invalidSavedThemePath = Join-Path $invalidSavedDirectory 'theme.json'
+    Write-DreamSkinUtf8FileAtomically -Path $invalidSavedThemePath `
+      -Content (($invalidSavedTheme | ConvertTo-Json -Depth 8) + "`r`n")
+    if ($invalidSaved.Extra) {
+      Write-DreamSkinUtf8FileAtomically -Path (Join-Path $invalidSavedDirectory 'unexpected.txt') `
+        -Content "not legacy state`r`n"
+    }
+    $invalidSavedHash = (Get-FileHash -LiteralPath $invalidSavedThemePath -Algorithm SHA256).Hash
+    $invalidSavedRejected = $false
+    try {
+      $null = Use-DreamSkinSavedTheme `
+        -ThemeDirectory $invalidSavedDirectory -StateRoot $themeStateRoot
+    } catch { $invalidSavedRejected = $true }
+    if (-not $invalidSavedRejected -or
+      (Get-FileHash -LiteralPath $invalidSavedThemePath -Algorithm SHA256).Hash -cne $invalidSavedHash -or
+      (Get-DreamSkinThemeRuntimeContentFingerprint -ThemeDirectory $themePaths.Active) -cne
+        $activeBeforeInvalidSaved) {
+      throw "Invalid legacy saved theme changed saved or active state: $($invalidSaved.Label)"
+    }
+    Remove-Item -LiteralPath $invalidSavedDirectory -Recurse -Force
+  }
+  Remove-Item -LiteralPath $legacySavedDirectory -Recurse -Force
+
+  foreach ($invalidLegacy in @(
+    [pscustomobject]@{ Label = 'future schema'; Id = 'custom'; Schema = 2; IncludeSchema = $true },
+    [pscustomobject]@{ Label = 'string schema'; Id = 'custom'; Schema = '1'; IncludeSchema = $true },
+    [pscustomobject]@{ Label = 'unknown id'; Id = 'not-a-managed-custom'; Schema = $null; IncludeSchema = $false }
+  )) {
+    $invalidRoot = Join-Path $temporaryRoot ('invalid-legacy-' + ($invalidLegacy.Label -replace ' ', '-'))
+    $invalidActive = Join-Path $invalidRoot 'active-theme'
+    New-Item -ItemType Directory -Path $invalidActive -Force | Out-Null
+    Copy-Item -LiteralPath (Join-Path $Root 'assets\dream-reference.jpg') `
+      -Destination (Join-Path $invalidActive 'background.jpg') -Force
+    $invalidTheme = [ordered]@{
+      id = $invalidLegacy.Id
+      name = $invalidLegacy.Label
+      image = 'background.jpg'
+      appearance = 'auto'
+      art = [ordered]@{ focusX = $null; focusY = $null; safeArea = 'auto'; taskMode = 'auto' }
+    }
+    if ($invalidLegacy.IncludeSchema) { $invalidTheme.schemaVersion = $invalidLegacy.Schema }
+    $invalidThemePath = Join-Path $invalidActive 'theme.json'
+    Write-DreamSkinUtf8FileAtomically -Path $invalidThemePath `
+      -Content (($invalidTheme | ConvertTo-Json -Depth 8) + "`r`n")
+    $beforeInvalidHash = (Get-FileHash -LiteralPath $invalidThemePath -Algorithm SHA256).Hash
+    if (Update-DreamSkinLegacyManagedActiveThemeSchema `
+      -ThemeDirectory $invalidActive -ManagedRoot $invalidRoot) {
+      throw "Legacy migration accepted $($invalidLegacy.Label)."
+    }
+    if ((Get-FileHash -LiteralPath $invalidThemePath -Algorithm SHA256).Hash -cne $beforeInvalidHash) {
+      throw "Legacy migration rewrote $($invalidLegacy.Label)."
+    }
+    $invalidPayload = Invoke-DreamSkinNative -FilePath $pathNode.Source -ArgumentList @(
+      (Join-Path $Root 'scripts\injector.mjs'), '--check-payload', '--theme-dir', $invalidActive)
+    if ($invalidPayload.ExitCode -eq 0) {
+      throw "Injector accepted $($invalidLegacy.Label) after migration refusal."
+    }
+  }
+
   $releaseFixtureRoot = Join-Path $temporaryRoot 'release-theme-fixture'
   $releaseFixtureAssets = Join-Path $releaseFixtureRoot 'assets'
   $releaseFixtureScripts = Join-Path $releaseFixtureRoot 'scripts'
@@ -1631,6 +1804,12 @@ args = [
   $imageMetadataTest = Invoke-DreamSkinNative -FilePath $node.Path -ArgumentList @(
     (Join-Path $PSScriptRoot 'image-metadata.test.mjs'))
   if ($imageMetadataTest.ExitCode -ne 0) { throw 'Image metadata regression test failed.' }
+  $themePathContainmentTest = Invoke-DreamSkinNative -FilePath $node.Path -ArgumentList @(
+    (Join-Path $PSScriptRoot 'theme-path-containment.test.mjs'))
+  if ($themePathContainmentTest.ExitCode -ne 0) { throw 'Theme path-containment regression test failed.' }
+  $themeSchemaContractTest = Invoke-DreamSkinNative -FilePath $node.Path -ArgumentList @(
+    (Join-Path $PSScriptRoot 'theme-schema-contract.test.mjs'))
+  if ($themeSchemaContractTest.ExitCode -ne 0) { throw 'Theme schema-contract regression test failed.' }
 
   Write-Host 'PASS: config transactions, restore scoping, state safety, argument quoting, and loopback CDP validation.'
 } finally {

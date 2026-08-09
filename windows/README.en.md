@@ -18,7 +18,7 @@ Codex Dream Skin loads an external theme into the official Codex Windows desktop
 ## Release install (recommended for users)
 
 Download `CodexDreamSkin-Setup-vX.Y.Z.exe` from
-[GitHub Releases](https://github.com/EmiyaKatuz/Codex-Dream-Skin/releases) and
+[GitHub Releases](https://github.com/EmiyaKatuz/Codex-Dream-Skin-Needy-Girl-Overdose/releases) and
 follow [`docs/install-windows.md`](../docs/install-windows.md). The installer
 contains the pinned Node runtime, so users do not need a source checkout or to
 run a `.ps1` file. It installs per-user and should not request administrator
@@ -264,13 +264,15 @@ Field results in issue #235 now confirm two independent failures: WindowsApps re
 
 Run the installer and launch shortcut again. The scripts rediscover the currently registered Store package instead of trusting an executable path from an older app version.
 
-Open the repository's [new issue page](https://github.com/EmiyaKatuz/Codex-Dream-Skin/issues/new/choose) and choose the bug form when reporting a problem. Include the Windows version, Codex source, reproduction steps, and relevant log lines. Remove secrets, `auth.json`, relay tokens, and private conversation content.
+Open the repository's [new issue page](https://github.com/EmiyaKatuz/Codex-Dream-Skin-Needy-Girl-Overdose/issues/new/choose) and choose the bug form when reporting a problem. Include the Windows version, Codex source, reproduction steps, and relevant log lines. Remove secrets, `auth.json`, relay tokens, and private conversation content.
 
 ## Security boundaries
 
-- CDP binds only to `127.0.0.1`. Avoid untrusted local software while the skin is active.
+- CDP binds only to `127.0.0.1`, but it has no authentication; another process on the same computer may still connect and inspect or control the renderer.
+- Pausing the theme or stopping only the injector does not close the debug port of a running Codex process. Use a full restore with restart, or quit every Codex process and reopen the official app normally, to end the exposure window.
 - The tool does not modify the official Codex installation, WindowsApps, `app.asar`, or signatures.
 - It does not write API keys, Base URLs, or model provider settings.
 - Restore controls only Codex processes that pass package identity, executable path, and recorded session checks.
+- See [`../SECURITY.md`](../SECURITY.md) for the complete threat model and operating guidance.
 
 Maintainer and agent constraints live in [`SKILL.md`](./SKILL.md). See [`references/runtime-notes.md`](./references/runtime-notes.md) for deeper runtime troubleshooting.
