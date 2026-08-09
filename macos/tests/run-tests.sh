@@ -71,15 +71,26 @@ fi
 /usr/bin/grep -F -q '<string>dreamskin</string>' "$ROOT/menubar-app/Resources/Info.plist.template"
 /usr/bin/grep -F -q '"assets/selectors.json"' \
   "$ROOT/menubar-app/Sources/CodexDreamSkinMenuBar/AppDelegate.swift"
+/usr/bin/grep -F -q '"scripts/check-image-dimensions.mjs"' \
+  "$ROOT/menubar-app/Sources/CodexDreamSkinMenuBar/AppDelegate.swift"
 /usr/bin/grep -F -q 'CommunityRecovery.preserveRollbackSnapshot' \
   "$ROOT/menubar-app/Sources/CodexDreamSkinMenuBar/AppDelegate.swift"
 /usr/bin/grep -F -q 'recovery/community-*/active-before' \
   "$ROOT/scripts/switch-theme-macos.sh"
 /usr/bin/grep -F -q 'CFBundleURLTypes.0.CFBundleURLSchemes.0' "$ROOT/scripts/build-dmg.sh"
 for required_runtime in apply-community-theme-macos.sh snapshot-active-theme-macos.sh \
-  theme-content-fingerprint.mjs theme-switch-lock-macos.sh; do
+  check-image-dimensions.mjs theme-content-fingerprint.mjs theme-switch-lock-macos.sh; do
   /usr/bin/grep -F -q "$required_runtime" "$ROOT/scripts/build-dmg.sh"
 done
+/usr/bin/grep -F -q 'check-image-dimensions.mjs' "$ROOT/scripts/build-menubar-app.sh"
+for upgraded_helper in check-image-dimensions.mjs image-metadata.mjs write-theme.mjs; do
+  /usr/bin/grep -F -q "$upgraded_helper" "$ROOT/scripts/install-menubar-macos.sh"
+done
+if /usr/bin/grep -F -q 'Fei-Away/Codex-Dream-Skin/releases' \
+  "$ROOT/menubar-app/Sources/CodexDreamSkinMenuBar/AppDelegate.swift"; then
+  printf 'Native update fallbacks must point to this fork, not upstream.\n' >&2
+  exit 1
+fi
 UPDATE_JSON="$({
   CODEX_DREAM_SKIN_TEST_RESPONSE_FILE="$ROOT/tests/fixtures/latest-release.json" \
     "$ROOT/scripts/check-update-macos.sh" --json
@@ -196,11 +207,13 @@ fi
 "$NODE" "$ROOT/tests/injector-session.test.mjs"
 "$NODE" "$ROOT/tests/window-readiness.test.mjs"
 "$NODE" "$ROOT/tests/renderer-inject.test.mjs"
+"$NODE" "$ROOT/tests/renderer-verification.test.mjs"
 "$NODE" "$ROOT/tests/safe-css-validator.test.mjs"
 "$NODE" "$ROOT/tests/theme-stage.test.mjs"
 "$NODE" "$ROOT/tests/theme-package-validator.test.mjs"
 "$NODE" "$ROOT/tests/theme-import-publish.test.mjs"
 "$NODE" "$ROOT/tests/theme-zip-snapshot.test.mjs"
+"$NODE" "$ROOT/tests/write-theme-contract.test.mjs"
 "$NODE" "$ROOT/tests/bounded-community-http.test.mjs"
 if [ "${CODEX_DREAM_SKIN_SKIP_SIGNED_RUNTIME_TESTS:-0}" = "1" ]; then
   printf 'SKIP: community import identity integration requires an installed, signed ChatGPT runtime.\n'
@@ -211,6 +224,37 @@ fi
 "$ROOT/tests/theme-zip-extract.test.sh"
 "$ROOT/tests/installer-preflight.test.sh"
 "$NODE" "$ROOT/tests/theme-config.test.mjs"
+
+# check-image-dimensions rejects decompression bombs before sips can rasterize them.
+write_png_header() { # <path> <width> <height>
+  "$NODE" -e '
+    const fs = require("node:fs");
+    const buffer = Buffer.alloc(24);
+    Buffer.from([0x89,0x50,0x4e,0x47,0x0d,0x0a,0x1a,0x0a]).copy(buffer, 0);
+    buffer.writeUInt32BE(13, 8);
+    buffer.write("IHDR", 12, "ascii");
+    buffer.writeUInt32BE(Number(process.argv[2]), 16);
+    buffer.writeUInt32BE(Number(process.argv[3]), 20);
+    fs.writeFileSync(process.argv[1], buffer);
+  ' "$1" "$2" "$3"
+}
+CID_TMP="$(/usr/bin/mktemp -d "${TMPDIR:-/tmp}/codex-dream-skin-cid.XXXXXX")"
+write_png_header "$CID_TMP/huge.png" 20000 20000
+if "$NODE" "$ROOT/scripts/check-image-dimensions.mjs" "$CID_TMP/huge.png" >/dev/null 2>&1; then
+  printf 'check-image-dimensions accepted a 20000x20000 (400 MP) image.\n' >&2
+  /bin/rm -rf "$CID_TMP"; exit 1
+fi
+write_png_header "$CID_TMP/ok.png" 1600 900
+if ! "$NODE" "$ROOT/scripts/check-image-dimensions.mjs" "$CID_TMP/ok.png" >/dev/null 2>&1; then
+  printf 'check-image-dimensions rejected a valid 1600x900 image.\n' >&2
+  /bin/rm -rf "$CID_TMP"; exit 1
+fi
+/usr/bin/printf 'not-an-image' > "$CID_TMP/invalid.png"
+if "$NODE" "$ROOT/scripts/check-image-dimensions.mjs" "$CID_TMP/invalid.png" >/dev/null 2>&1; then
+  printf 'check-image-dimensions accepted an image whose dimensions could not be determined safely.\n' >&2
+  /bin/rm -rf "$CID_TMP"; exit 1
+fi
+/bin/rm -rf "$CID_TMP"
 
 # Every bundled preset must be a valid, injectable theme pack with a preset-* id.
 for preset in "$ROOT"/presets/preset-*/; do
@@ -745,6 +789,42 @@ if /usr/bin/grep -F -q 'launchctl remove "$INJECTOR_JOB_LABEL" >/dev/null 2>&1 |
 fi
 if /usr/bin/grep -F -q 'index($0, "--port " port)' "$ROOT/scripts/common-macos.sh"; then
   printf 'injector discovery still accepts a near-prefix port.\n' >&2
+  exit 1
+fi
+APPLY_SCRIPT="$ROOT/scripts/apply-from-menubar-macos.sh"
+/usr/bin/grep -F -q 'if hot_reapply_theme "$PORT" 8000; then' "$APPLY_SCRIPT"
+/usr/bin/grep -F -q 'SESSION="off"' "$APPLY_SCRIPT"
+/usr/bin/grep -F -q 'if ! confirm "$PROMPT" "$OK_LABEL"; then' "$APPLY_SCRIPT"
+/usr/bin/grep -F -q '"$SCRIPT_DIR/start-dream-skin-macos.sh" --restart-existing' "$APPLY_SCRIPT"
+if /usr/bin/grep -F -q 'CODEX_RUNNING=' "$APPLY_SCRIPT" ||
+   /usr/bin/grep -F -q 'MENU_ACTION=' "$APPLY_SCRIPT" ||
+   /usr/bin/grep -F -q 'OPEN_PROMPT=' "$APPLY_SCRIPT"; then
+  printf 'menu apply must preserve the original session-driven prompt model.\n' >&2
+  exit 1
+fi
+HOT_LINE="$(/usr/bin/grep -n 'hot_reapply_theme "$PORT" 8000' "$APPLY_SCRIPT" | /usr/bin/head -1 | /usr/bin/cut -d: -f1)"
+CONFIRM_LINE="$(/usr/bin/grep -n 'if ! confirm "$PROMPT" "$OK_LABEL"; then' "$APPLY_SCRIPT" | /usr/bin/head -1 | /usr/bin/cut -d: -f1)"
+START_LINE="$(/usr/bin/grep -n 'start-dream-skin-macos.sh" --restart-existing' "$APPLY_SCRIPT" | /usr/bin/head -1 | /usr/bin/cut -d: -f1)"
+if [ -z "$HOT_LINE" ] || [ -z "$CONFIRM_LINE" ] || [ -z "$START_LINE" ] ||
+   [ "$CONFIRM_LINE" -ge "$HOT_LINE" ] ||
+   [ "$HOT_LINE" -ge "$START_LINE" ]; then
+  printf 'menu apply must keep its confirmation and hot-reapply before falling back to start.\n' >&2
+  exit 1
+fi
+MENU_SOURCE="$ROOT/menubar-app/Sources/CodexDreamSkinMenuBar/AppDelegate.swift"
+OPEN_CODEX_BODY="$(/usr/bin/sed -n '/@objc private func openCodex()/,/@objc private func openDreamSkinWebsite()/p' "$MENU_SOURCE")"
+/usr/bin/grep -F -q 'addActionItem("打开 ChatGPT", action: #selector(openCodex), enabled: !busy)' "$MENU_SOURCE"
+/usr/bin/grep -F -q 'showError(title: "未找到 ChatGPT", message: "请先安装并至少启动一次官方 ChatGPT / Codex 桌面应用。")' "$MENU_SOURCE"
+/usr/bin/grep -F -q 'NSWorkspace.shared.openApplication(at: appURL, configuration: configuration)' "$MENU_SOURCE"
+if /usr/bin/grep -F -q 'applyTitle = "打开并应用皮肤"' "$MENU_SOURCE" ||
+   /usr/bin/grep -F -q 'runInstalledScript(named: "apply-from-menubar-macos.sh", operation: "打开 ChatGPT")' "$MENU_SOURCE" ||
+   /usr/bin/printf '%s\n' "$OPEN_CODEX_BODY" | /usr/bin/grep -E -q \
+     'installBundledEngineIfNeeded\(force:|start-dream-skin-macos\.sh|ScriptRunner\.run'; then
+  printf 'Open ChatGPT must remain a native open/focus action and must not apply or install the engine.\n' >&2
+  exit 1
+fi
+if ! /usr/bin/grep -F -q 'auto|ambient|banner|full|off' "$ROOT/scripts/load-image-theme-macos.sh"; then
+  printf 'The image-theme shell entry must accept every writer task mode, including full.\n' >&2
   exit 1
 fi
 

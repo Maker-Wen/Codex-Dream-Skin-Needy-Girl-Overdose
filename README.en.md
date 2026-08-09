@@ -13,7 +13,7 @@
   <img src="windows/assets/dream-reference.jpg" alt="INTERNET ANGEL theme background" width="900">
 </p>
 
-> Current version: `1.5.13`. Windows, macOS, and Linux share the same INTERNET ANGEL component classifier, overlay, and animation runtime.
+> Current version: `1.5.14`. Windows, macOS, and Linux share the same INTERNET ANGEL component classifier, overlay, and animation runtime.
 
 This independent fork builds on [Fei-Away/Codex-Dream-Skin](https://github.com/Fei-Away/Codex-Dream-Skin). Its focus is the INTERNET ANGEL visual system, cross-platform parity, launcher compatibility, and clear security boundaries.
 
@@ -30,7 +30,7 @@ This independent fork builds on [Fei-Away/Codex-Dream-Skin](https://github.com/F
 
 ### Windows Release
 
-1. Download `CodexDreamSkin-Setup-vX.Y.Z.exe` and `SHA256SUMS.txt` from the [latest release](https://github.com/EmiyaKatuz/Codex-Dream-Skin/releases/latest).
+1. Download `CodexDreamSkin-Setup-vX.Y.Z.exe` and `SHA256SUMS.txt` from the [latest release](https://github.com/EmiyaKatuz/Codex-Dream-Skin-Needy-Girl-Overdose/releases/latest).
 2. Verify the Setup.exe SHA-256.
 3. Run the installer, then launch `Codex Dream Skin` from the Start menu.
 
@@ -50,7 +50,7 @@ Runtime and theme data are installed under `%LOCALAPPDATA%\CodexDreamSkin`. The 
 
 ### macOS
 
-Download `CodexDreamSkin-vX.Y.Z.dmg` from the [latest release](https://github.com/EmiyaKatuz/Codex-Dream-Skin/releases/latest), move the app to Applications, and launch it. The DMG includes its runtime. Current builds use ad-hoc signing; complete the first-launch approval in macOS Settings. See the [macOS installation guide](./docs/install-macos.md).
+Download `CodexDreamSkin-vX.Y.Z.dmg` from the [latest release](https://github.com/EmiyaKatuz/Codex-Dream-Skin-Needy-Girl-Overdose/releases/latest), move the app to Applications, and launch it. The DMG includes its runtime. Current builds use ad-hoc signing; complete the first-launch approval in macOS Settings. See the [macOS installation guide](./docs/install-macos.md).
 
 ### Linux
 
@@ -76,6 +76,7 @@ See the [Linux guide](./linux/README.md) for verification, restore, release arch
 - When Codex does not expose a CDP `Browser.WindowID`, the compatibility path accepts only Win32 HWND evidence. The launcher uses `EnumWindows` to require a visible, non-minimized, adequately sized HWND, then revalidates that the owning process belongs to the verified official `ChatGPT.exe`.
 - DOM visibility, viewport size, and Codex structure remain independent hard requirements. Renderer evidence alone cannot satisfy native-window verification.
 - Images, ZIP archives, paths, symbolic links, Safe CSS, runtime hashes, and process identities have bounded validation. See the [Windows installation guide](./docs/install-windows.md) for format limits.
+- Loopback is not authentication; see [`SECURITY.md`](./SECURITY.md) for the CDP exposure window and safer operating guidance.
 
 ## Development and verification
 
@@ -97,7 +98,7 @@ The macOS regression entry point is `./macos/tests/run-tests.sh`. See [`docs/pla
 
 - This is an unofficial, community-maintained project. Codex and related rights belong to their respective owners.
 - IP assets and trademarks shown by this theme or skin belong to their respective owners.
-- The project follows the upstream license; see [`macos/LICENSE`](./macos/LICENSE) and [`macos/NOTICE.md`](./macos/NOTICE.md).
+- This project is MIT licensed; see [`LICENSE`](./LICENSE) and [`macos/NOTICE.md`](./macos/NOTICE.md).
 
 ## Credits
 

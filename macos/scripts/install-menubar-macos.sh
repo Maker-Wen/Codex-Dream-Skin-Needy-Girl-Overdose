@@ -47,6 +47,11 @@ if [ -d "$INSTALL_ROOT" ] && [ "$PROJECT_ROOT" != "$INSTALL_ROOT" ]; then
       /bin/chmod 755 "$INSTALL_ROOT/scripts/$name"
     fi
   done
+  for name in check-image-dimensions.mjs image-metadata.mjs write-theme.mjs; do
+    [ -f "$PROJECT_ROOT/scripts/$name" ] || fail "Menu upgrade helper missing: $name"
+    /bin/cp -f "$PROJECT_ROOT/scripts/$name" "$INSTALL_ROOT/scripts/$name"
+    /bin/chmod 644 "$INSTALL_ROOT/scripts/$name"
+  done
 fi
 
 /bin/chmod 755 \

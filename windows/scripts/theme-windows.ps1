@@ -440,6 +440,58 @@ function Normalize-DreamSkinThemeContract {
   return $Theme
 }
 
+function Update-DreamSkinLegacyManagedActiveThemeSchema {
+  param(
+    [Parameter(Mandatory = $true)][string]$ThemeDirectory,
+    [Parameter(Mandatory = $true)][string]$ManagedRoot
+  )
+  $root = [System.IO.Path]::GetFullPath($ManagedRoot).TrimEnd('\')
+  $directory = [System.IO.Path]::GetFullPath($ThemeDirectory).TrimEnd('\')
+  $expectedActive = (Join-Path $root 'active-theme').TrimEnd('\')
+  if (-not $directory.Equals($expectedActive, [System.StringComparison]::OrdinalIgnoreCase) -or
+    -not (Test-DreamSkinThemePathWithin -Path $directory -Root $root)) {
+    throw 'Legacy theme migration is restricted to the managed active-theme directory.'
+  }
+  Assert-DreamSkinNoReparseComponents -Path $directory
+  $themePath = Join-Path $directory 'theme.json'
+  Assert-DreamSkinNoReparseComponents -Path $themePath
+  if (-not (Test-Path -LiteralPath $themePath -PathType Leaf)) { return $false }
+  try {
+    $theme = (Read-DreamSkinUtf8File -Path $themePath) | ConvertFrom-Json -ErrorAction Stop
+  } catch {
+    throw "Managed active theme metadata is invalid JSON: $themePath"
+  }
+  if ($null -eq $theme -or $theme -is [string] -or $theme -is [array]) {
+    throw "Managed active theme metadata must be an object: $themePath"
+  }
+  if ($theme.PSObject.Properties['schemaVersion']) { return $false }
+  $idProperty = $theme.PSObject.Properties['id']
+  if ($null -eq $idProperty -or $idProperty.Value -isnot [string] -or
+    $idProperty.Value -cne 'custom') {
+    return $false
+  }
+  $imageProperty = $theme.PSObject.Properties['image']
+  if ($null -eq $imageProperty -or $imageProperty.Value -isnot [string] -or
+    -not $imageProperty.Value) {
+    throw 'Legacy managed custom theme must name its image.'
+  }
+  $image = [string]$imageProperty.Value
+  if ([System.IO.Path]::IsPathRooted($image)) {
+    throw 'Legacy managed custom theme image path must be relative.'
+  }
+  $imagePath = [System.IO.Path]::GetFullPath((Join-Path $directory $image))
+  if (-not (Test-DreamSkinThemePathWithin -Path $imagePath -Root $directory) -or
+    -not (Test-Path -LiteralPath $imagePath -PathType Leaf)) {
+    throw 'Legacy managed custom theme image must stay inside active-theme and exist.'
+  }
+  Assert-DreamSkinNoReparseComponents -Path $imagePath
+  Assert-DreamSkinImageFile -Path $imagePath
+  $theme | Add-Member -NotePropertyName schemaVersion -NotePropertyValue 1
+  Write-DreamSkinUtf8FileAtomically -Path $themePath `
+    -Content (($theme | ConvertTo-Json -Depth 8) + "`r`n")
+  return $true
+}
+
 function Write-DreamSkinTheme {
   param(
     [Parameter(Mandatory = $true)][string]$ThemeDirectory,
@@ -499,6 +551,8 @@ function Initialize-DreamSkinThemeStore {
     Assert-DreamSkinNoReparseComponents -Path $activeTheme
     Copy-Item -LiteralPath (Join-Path $assetRoot 'theme.json') -Destination $activeTheme -Force
   }
+  $null = Update-DreamSkinLegacyManagedActiveThemeSchema `
+    -ThemeDirectory $paths.Active -ManagedRoot $paths.Root
   foreach ($retiredPresetId in @('preset-romantic-rose', 'preset-arina-hashimoto')) {
     $retiredPresetDirectory = Join-Path $paths.Saved $retiredPresetId
     Assert-DreamSkinNoReparseComponents -Path $retiredPresetDirectory
@@ -622,6 +676,7 @@ function Set-DreamSkinActiveTheme {
   try { $oldImage = (Read-DreamSkinTheme -ThemeDirectory $paths.Active).ImagePath } catch {}
   if ($null -eq $Theme) {
     $Theme = [pscustomobject]@{
+      schemaVersion = 1
       id = 'custom'
       name = '自定义主题'
       appearance = 'auto'

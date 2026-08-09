@@ -97,6 +97,9 @@ done
 [ -f "$MOUNTED_ENGINE/scripts/theme-content-fingerprint.mjs" ] \
   && [ ! -x "$MOUNTED_ENGINE/scripts/theme-content-fingerprint.mjs" ] \
   || { printf 'Mounted fingerprint helper has unsafe or missing permissions.\n' >&2; exit 1; }
+[ -s "$MOUNTED_ENGINE/scripts/check-image-dimensions.mjs" ] \
+  && [ ! -x "$MOUNTED_ENGINE/scripts/check-image-dimensions.mjs" ] \
+  || { printf 'Mounted image-dimension helper has unsafe or missing permissions.\n' >&2; exit 1; }
 for excluded in build-client-release.sh build-dmg.sh build-menubar-app.sh build-release.sh \
   generate-app-icon.sh install-menubar-macos.sh prepare-standalone-docs.sh; do
   [ ! -e "$MOUNTED_APP/Contents/Resources/engine/scripts/$excluded" ] \

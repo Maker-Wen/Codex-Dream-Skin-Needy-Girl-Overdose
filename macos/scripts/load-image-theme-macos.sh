@@ -33,7 +33,7 @@ done
 
 case "$APPEARANCE" in auto|light|dark) ;; *) fail "Invalid appearance: $APPEARANCE" ;; esac
 case "$SAFE_AREA" in auto|left|right|center|none) ;; *) fail "Invalid safe area: $SAFE_AREA" ;; esac
-case "$TASK_MODE" in auto|ambient|banner|off) ;; *) fail "Invalid task mode: $TASK_MODE" ;; esac
+case "$TASK_MODE" in auto|ambient|banner|full|off) ;; *) fail "Invalid task mode: $TASK_MODE" ;; esac
 
 ensure_state_root
 IMAGES_DIR="$STATE_ROOT/images"
@@ -77,6 +77,10 @@ progress "Loading image..."
 
 # Fast Node for write-theme (avoid full codesign when possible)
 ensure_node_runtime
+
+# Reject decompression bombs before `sips -Z` rasterizes the full source image.
+"$NODE" "$SCRIPT_DIR/check-image-dimensions.mjs" "$IMAGE" \
+  || fail "Image dimensions are invalid or exceed the safe pixel budget (max 16384 px per side / 50 megapixels)."
 
 image_name="background.jpg"
 temporary="$THEME_DIR/.background.$$.tmp.jpg"
