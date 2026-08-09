@@ -3,10 +3,12 @@ import fs from "node:fs/promises";
 import path from "node:path";
 import vm from "node:vm";
 import { fileURLToPath } from "node:url";
+import { verifySession } from "../scripts/injector.mjs";
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const windowsRoot = path.resolve(here, "..");
 const template = await fs.readFile(path.join(windowsRoot, "assets", "renderer-inject.js"), "utf8");
+const expectedSkinVersion = (await fs.readFile(path.join(windowsRoot, "VERSION"), "utf8")).trim();
 const linuxTemplate = await fs.readFile(
   path.join(windowsRoot, "..", "linux", "assets", "renderer-inject.js"),
   "utf8",
@@ -33,8 +35,8 @@ assert.ok(template.includes("const missingL1 = [")
   && template.includes("missingL1,"),
   "The Windows renderer scope must expose missingL1 so live verification can accept a generic composer.");
 const genericComposerMutationBody = template.slice(
-  template.indexOf("const hasKnownComposer = Boolean(document.querySelector("),
-  template.indexOf("if (hasShellChange || hasGenericComposerNode)"),
+  template.indexOf("const hasGenericComposerNode = records.some("),
+  template.indexOf("if (hasShellChange || hasGenericComposerNode || hasHomeSuggestionChange)"),
 );
 const sidebarScrollHandlerBody = template.slice(
   template.indexOf("const sidebarScrollHandler = (event) =>"),
@@ -45,13 +47,13 @@ const broadScrollLookupAt = sidebarScrollHandlerBody.indexOf(
   '${SIDEBAR_SELECTOR}, .thread-scroll-container',
 );
 assert.ok(template.includes("hasGenericComposerNode")
-  && template.includes("const hasKnownComposer = Boolean(document.querySelector(")
   && template.includes("scheduleEnsure(DOM_REFRESH_DEBOUNCE_MS)")
   && template.includes("composerOwnerSelector")
+  && template.includes("genericComposerRootSelector")
+  && template.includes("genericComposerRejectSelector")
+  && template.includes("const isValidOwner = (owner, input) =>")
   && template.includes("owner.parentElement?.closest?.(composerOwnerSelector)")
-  && template.includes("owner.closest?.('aside')")
   && template.includes("const findGenericComposers = () =>")
-  && template.includes('[class*="ComposerLayoutRoot" i], [class*="terminal-panel" i]')
   && template.includes('const themeDiffsContainers = (hosts = all("diffs-container")) =>')
   && template.includes('all("diffs-container")')
   && template.includes("DIFFS_THEME_STYLE_ID")
@@ -62,10 +64,8 @@ assert.ok(template.includes("hasGenericComposerNode")
   && !template.includes('aside.app-shell-left-panel button,')
   && !genericComposerMutationBody.includes('[class*="prompt" i]')
   && template.includes("scheduleEnsure(64)")
-  && template.includes('[contenteditable], [role="textbox"], [data-placeholder]')
-  && template.includes("node.closest?.('[class*=\"ComposerLayout\" i]')")
-  && template.includes('all(\'[class*="ComposerLayoutRoot" i], [class*="terminal-panel" i]\')')
-  && template.includes('[class*="terminal-panel" i]'),
+  && template.includes('[contenteditable]:not([contenteditable="false"])')
+  && template.includes("all(genericComposerRootSelector)"),
   "The Windows renderer must re-run classification and mark the outermost composer, including side chat.");
 assert.ok(css.includes('html.codex-dream-skin [data-ds-part="composer"]')
   && css.includes("aside:not(.app-shell-left-panel)")
@@ -126,7 +126,7 @@ const buildPayloadFrom = (rendererTemplate, config = {}, sidebarQuietEnabled = t
   .replace("__DREAM_CSS_JSON__", JSON.stringify(".fixture { color: blue; }"))
   .replace("__DREAM_ART_JSON__", JSON.stringify("data:image/png;base64,AA=="))
   .replace("__DREAM_THEME_JSON__", JSON.stringify(config))
-  .replace("__DREAM_SKIN_VERSION_JSON__", JSON.stringify("1.3.5"))
+  .replace("__DREAM_SKIN_VERSION_JSON__", JSON.stringify(expectedSkinVersion))
   .replace("__DREAM_SKIN_PAYLOAD_REVISION_JSON__", JSON.stringify("test-revision"))
   .replace("__DREAM_SIDEBAR_SCROLL_QUIET_ENABLED_JSON__", JSON.stringify(sidebarQuietEnabled));
 const buildPayload = (config = {}) => buildPayloadFrom(template, config);
@@ -142,13 +142,13 @@ assert.ok(template.includes("resetToastSurface")
   "The system-toast classifier must skin the rendered aside rather than its transparent banner stack.");
 assert.ok(template.includes('const FALLBACK_PRESETS_ID = "codex-dream-skin-presets"')
   && template.includes("ensureFallbackPresets(home, matchedNativePresets.size)")
-  && template.includes("nativePresetCount < fallbackPresetDefinitions.length")
+  && template.includes("nativePresetCount < NATIVE_PRESET_MIN_COUNT")
   && template.includes('else deck.setAttribute("hidden", "")')
   && template.includes('deck.removeAttribute?.("hidden")')
   && template.includes('const primedFallbackDeck = document.getElementById(FALLBACK_PRESETS_ID)')
-  && template.includes("if (isPresetRendered(button)) matchedNativePresets.add(button)")
-  && css.includes('.dream-presets-ready .dream-home .group\\/home-suggestions'),
-  "Home must retain a primed fallback and show it whenever the complete visible native preset set is unavailable.");
+  && template.includes("if (isRenderedElement(button)) matchedNativePresets.add(button)")
+  && css.includes(".dream-presets-ready .dream-native-suggestions-root"),
+  "Home must retain a primed fallback until two visible native suggestions exist, hiding only the normalized deck root.");
 assert.ok(template.includes('.ProseMirror[contenteditable="true"]')
   && template.includes('document.execCommand?.("insertText", false, prompt)')
   && template.includes('new InputEvent("input"'),
@@ -213,8 +213,7 @@ assert.match(css, /dream-composer-context-strip,[\s\S]*?sticky[\s\S]*?border-x[\
 assert.ok(template.includes('deck.setAttribute("data-dream-ready", "false")')
   && template.includes('deck.setAttribute("data-dream-ready", String(ready))')
   && template.includes('classList?.toggle?.("dream-presets-ready", ready)')
-  && template.includes('else deck.setAttribute("hidden", "")')
-  && css.includes('.dream-presets-ready .dream-home'),
+  && template.includes('else deck.setAttribute("hidden", "")'),
   "Fallback presets must stay primed in the Home DOM and reveal without a two-frame blank transition.");
 for (const panelClass of ["dream-terminal-panel", "dream-side-workspace", "dream-side-chat-panel", "dream-summary-panel"]) {
   assert.match(template, new RegExp(panelClass), `The renderer must classify ${panelClass}.`);
@@ -427,14 +426,15 @@ assert.ok(template.includes('const withoutManagedClasses = (value)')
 assert.ok(template.includes("const observeRendererStructure = () =>")
   && template.includes("observer.observe(body, { ...attributeOptions, childList: true })")
   && template.includes("observer.observe(shellMain, { childList: true })")
-  && !template.includes("subtree: true"),
-  "DOM observation must stay on root, body, and shell boundaries instead of the streaming subtree.");
+  && template.includes("activeHomeSuggestionRoot")
+  && template.includes("subtree: true"),
+  "DOM observation must stay boundary-scoped except for the active normalized Home deck or temporary fallback probe.");
 assert.ok(template.includes("const classifyRuntimeSurfaces = (records)")
   && template.includes("dream-turn-preview-surface")
   && template.includes("dream-composer-palette")
   && template.includes("dream-settings-menu"),
   "New portal surfaces must receive local first-frame classification without a full DOM scan.");
-assert.ok(template.includes('const STYLE_REVISION = "10"')
+assert.ok(template.includes('const STYLE_REVISION = "11"')
   && template.includes('existingStyle.dataset.dreamVersion = STYLE_REVISION')
   && !template.includes('existingStyle.dataset.dreamVersion = "3"'),
   "Reinjection must not parse and apply the full stylesheet twice for one refresh.");
@@ -654,6 +654,256 @@ assert.doesNotMatch(
   "The skin must preserve Codex's native fixed header so the side-panel toggle remains reachable.",
 );
 
+function makeBehaviorClassList(values = []) {
+  const classes = new Set(values);
+  return {
+    add(...names) { names.forEach((name) => classes.add(name)); },
+    remove(...names) { names.forEach((name) => classes.delete(name)); },
+    toggle(name, enabled) {
+      if (enabled === undefined) enabled = !classes.has(name);
+      if (enabled) classes.add(name);
+      else classes.delete(name);
+      return enabled;
+    },
+    contains(name) { return classes.has(name); },
+    [Symbol.iterator]() { return classes[Symbol.iterator](); },
+    toString() { return [...classes].join(" "); },
+  };
+}
+
+function makeBehaviorNode({
+  tagName = "div",
+  classes = [],
+  attributes = {},
+  visible = true,
+  rect = { x: 20, y: 20, width: 320, height: 120 },
+  text = "",
+} = {}) {
+  const attrs = new Map(Object.entries(attributes).map(([key, value]) => [key, String(value)]));
+  const classList = makeBehaviorClassList(classes);
+  const normalizedRect = {
+    ...rect,
+    right: rect.right ?? rect.x + rect.width,
+    bottom: rect.bottom ?? rect.y + rect.height,
+  };
+  const node = {
+    nodeType: 1,
+    tagName: tagName.toUpperCase(),
+    parentElement: null,
+    children: [],
+    childNodes: text ? [{ nodeType: 3, textContent: text }] : [],
+    textContent: text,
+    isConnected: true,
+    classList,
+    _style: {
+      display: visible ? "block" : "none",
+      visibility: "visible",
+      contentVisibility: "visible",
+      opacity: "1",
+      color: "rgb(230, 230, 230)",
+    },
+    getAttribute(name) {
+      if (name === "class") return classList.toString();
+      return attrs.get(name) ?? null;
+    },
+    setAttribute(name, value) { attrs.set(name, String(value)); },
+    removeAttribute(name) { attrs.delete(name); },
+    appendChild(child) {
+      child.parentElement = node;
+      child.isConnected = true;
+      node.children.push(child);
+      return child;
+    },
+    remove() {
+      if (node.parentElement?.children) {
+        node.parentElement.children = node.parentElement.children.filter((child) => child !== node);
+      }
+      node.parentElement = null;
+      node.isConnected = false;
+    },
+    contains(candidate) {
+      for (let current = candidate; current; current = current.parentElement) {
+        if (current === node) return true;
+      }
+      return false;
+    },
+    matches(selector) {
+      const value = String(selector || "");
+      const lowerClasses = [...classList].map((name) => name.toLowerCase());
+      const classFragments = [...value.matchAll(/\[class\*="([^"]+)"(?:\s+i)?\]/gi)]
+        .map((match) => match[1].toLowerCase());
+      if (classFragments.some((fragment) => lowerClasses.some((name) => name.includes(fragment)))) {
+        return true;
+      }
+      const exactClasses = [...value.matchAll(/\[class~="([^"]+)"\]/gi)].map((match) => match[1]);
+      if (exactClasses.some((name) => classList.contains(name))) return true;
+      if (value.includes(".group\\/home-suggestions") && classList.contains("group/home-suggestions")) {
+        return true;
+      }
+      if (value.includes(".composer-surface-chrome") && classList.contains("composer-surface-chrome")) {
+        return true;
+      }
+      if (value.includes(".dream-native-suggestions-root") &&
+        classList.contains("dream-native-suggestions-root")) return true;
+      if (value.includes(".dream-generated-preset") && classList.contains("dream-generated-preset")) {
+        return true;
+      }
+      const testId = attrs.get("data-testid") || "";
+      if (/data-testid\*="home-suggestion"/i.test(value) && /home-suggestion/i.test(testId)) return true;
+      if (value.includes('[data-testid="home-suggestions"]') && testId === "home-suggestions") return true;
+      if (value.includes('[data-testid="home-icon"]') && testId === "home-icon") return true;
+      if (value.includes('[data-feature="game-source"]') && attrs.get("data-feature") === "game-source") {
+        return true;
+      }
+      if (value.includes('[data-feature="home-suggestions"]') &&
+        attrs.get("data-feature") === "home-suggestions") return true;
+      if (/data-testid\*="composer"/i.test(value) && /composer/i.test(testId)) return true;
+      if (/data-testid\*="prompt"/i.test(value) && /prompt/i.test(testId)) return true;
+      if (value.includes("[data-composer-footer-responsive]") &&
+        attrs.has("data-composer-footer-responsive")) return true;
+      const role = attrs.get("role");
+      if (value.includes('[role="textbox"]') && role === "textbox") return true;
+      if (value.includes('[role="dialog"]') && role === "dialog") return true;
+      if (value.includes('[role="main"]') && role === "main") return true;
+      if (value.includes('[aria-modal="true"]') && attrs.get("aria-modal") === "true") return true;
+      if (value.includes("[data-placeholder]") && attrs.has("data-placeholder")) return true;
+      if (value.includes("[data-ds-part]") && attrs.has("data-ds-part")) return true;
+      if (value.includes('[data-ds-part="composer"]') && attrs.get("data-ds-part") === "composer") {
+        return true;
+      }
+      if (value.includes("[contenteditable") && attrs.get("contenteditable") === "true") return true;
+      const hasBareTag = (name) => new RegExp(`(^|[,\\s])${name}(?=$|[,\\s:\\[])`, "i").test(value);
+      if (hasBareTag("textarea") && node.tagName === "TEXTAREA") return true;
+      if (hasBareTag("input") && node.tagName === "INPUT") return true;
+      if (hasBareTag("button") && node.tagName === "BUTTON") return true;
+      if (hasBareTag("aside") && node.tagName === "ASIDE") return true;
+      if (hasBareTag("main") && node.tagName === "MAIN") return true;
+      if (hasBareTag("h1") && node.tagName === "H1") return true;
+      if (hasBareTag("h2") && node.tagName === "H2") return true;
+      if (value.includes('[role="heading"]') && role === "heading") return true;
+      return false;
+    },
+    closest(selector) {
+      for (let current = node; current; current = current.parentElement) {
+        if (current.matches?.(selector)) return current;
+      }
+      return null;
+    },
+    querySelectorAll(selector) {
+      const matches = [];
+      const visit = (parent) => {
+        for (const child of parent.children || []) {
+          if (child.matches?.(selector)) matches.push(child);
+          visit(child);
+        }
+      };
+      visit(node);
+      return matches;
+    },
+    querySelector(selector) { return node.querySelectorAll(selector)[0] ?? null; },
+    getBoundingClientRect() { return normalizedRect; },
+    checkVisibility() { return visible; },
+  };
+  return node;
+}
+
+function installComputedStyleBridge(fixture) {
+  const original = fixture.context.getComputedStyle;
+  fixture.context.getComputedStyle = (node) => ({
+    ...(original?.(node) || {}),
+    ...(node?._style || {}),
+  });
+}
+
+function installHomeSuggestionDom(fixture, {
+  includeHomeIcon = false,
+  signals = [],
+  deck = null,
+} = {}) {
+  const { shellMain, context } = fixture;
+  const wrapper = makeBehaviorNode({ classes: ["existing-home-wrapper"] });
+  const homeIcon = includeHomeIcon
+    ? makeBehaviorNode({ attributes: { "data-testid": "home-icon" }, rect: { x: 36, y: 42, width: 32, height: 32 } })
+    : null;
+  shellMain.nodeType = 1;
+  shellMain.tagName = "MAIN";
+  shellMain.parentElement = null;
+  shellMain.children = [wrapper];
+  shellMain.matches = (selector) => String(selector).includes("main") || String(selector).includes('[role="main"]');
+  shellMain.closest = (selector) => shellMain.matches(selector) ? shellMain : null;
+  shellMain.getAttribute = (name) => name === "role" ? "main" : null;
+  wrapper.parentElement = shellMain;
+  if (homeIcon) wrapper.appendChild(homeIcon);
+  signals.forEach((signal) => wrapper.appendChild(signal));
+  if (deck) wrapper.appendChild(deck);
+  const originalShellQueryAll = shellMain.querySelectorAll.bind(shellMain);
+  shellMain.querySelectorAll = (selector) => {
+    const descendants = wrapper.matches(selector) ? [wrapper] : wrapper.querySelectorAll(selector);
+    return [...new Set([...descendants, ...originalShellQueryAll(selector)])];
+  };
+  shellMain.querySelector = (selector) => shellMain.querySelectorAll(selector)[0] ?? null;
+  shellMain.appendChild = (node) => {
+    node.parentElement = shellMain;
+    node.isConnected = true;
+    shellMain.children.push(node);
+    if (node.id) fixture.nodes.set(node.id, node);
+    return node;
+  };
+
+  const originalQuery = context.document.querySelector.bind(context.document);
+  const originalQueryAll = context.document.querySelectorAll.bind(context.document);
+  context.document.querySelector = (selector) => {
+    if (selector === '[role="main"]') return shellMain;
+    if (selector === '[role="main"]:has([data-testid="home-icon"])') {
+      return shellMain.querySelector('[data-testid="home-icon"]') ? shellMain : null;
+    }
+    if (selector === '[role="main"].dream-home') {
+      return shellMain.classList.contains("dream-home") ? shellMain : null;
+    }
+    return shellMain.querySelector(selector) ?? originalQuery(selector);
+  };
+  context.document.querySelectorAll = (selector) => {
+    if (selector === '[role="main"]') return [shellMain];
+    const behaviorMatches = shellMain.querySelectorAll(selector);
+    return [...new Set([...behaviorMatches, ...originalQueryAll(selector)])];
+  };
+  installComputedStyleBridge(fixture);
+  return {
+    wrapper,
+    homeIcon,
+    mountSuggestionDeck(nextDeck) { wrapper.appendChild(nextDeck); },
+  };
+}
+
+function installGenericComposerDom(fixture, { roots = [], inputs = [], extraNodes = [] } = {}) {
+  const { shellMain, context } = fixture;
+  const allNodes = [...roots, ...inputs, ...extraNodes];
+  const originalQuery = context.document.querySelector.bind(context.document);
+  const originalQueryAll = context.document.querySelectorAll.bind(context.document);
+  context.document.querySelectorAll = (selector) => {
+    const matches = allNodes.filter((node) => node.matches?.(selector));
+    if (selector === "[data-ds-part]") {
+      return allNodes.filter((node) => node.getAttribute?.("data-ds-part") !== null);
+    }
+    return [...new Set([...matches, ...originalQueryAll(selector)])];
+  };
+  context.document.querySelector = (selector) =>
+    context.document.querySelectorAll(selector)[0] ?? originalQuery(selector);
+  const mainChildren = allNodes.filter((node) => node.closest?.("aside") === null);
+  shellMain.contains = (candidate) => mainChildren.some((node) => node === candidate || node.contains?.(candidate));
+  installComputedStyleBridge(fixture);
+  return {
+    addNodes({ roots: nextRoots = [], inputs: nextInputs = [], extraNodes: nextExtra = [] } = {}) {
+      roots.push(...nextRoots);
+      inputs.push(...nextInputs);
+      extraNodes.push(...nextExtra);
+      allNodes.push(...nextRoots, ...nextInputs, ...nextExtra);
+      mainChildren.push(...[...nextRoots, ...nextInputs, ...nextExtra]
+        .filter((node) => node.closest?.("aside") === null));
+    },
+  };
+}
+
 function createFixture({
   shellPresent,
   mainPresent = shellPresent,
@@ -673,6 +923,7 @@ function createFixture({
   throwOnTextScan = false,
   textScanCandidates = [],
   turnRowCount = 0,
+  fakeClock = false,
 }) {
   const nodes = new Map();
   const rootClasses = new Set(staleSkin ? ["codex-dream-skin"] : []);
@@ -686,11 +937,16 @@ function createFixture({
   const timeouts = new Map();
   const intervalDelays = [];
   const intervalCallbacks = [];
+  const animationFrames = new Map();
   let objectUrlCount = 0;
+  let animationFrameCalls = 0;
+  let clockNow = 0;
   let hasMain = mainPresent;
   let hasShellMainSelector = shellMainSelectorPresent;
   let hasSidebar = sidebarPresent;
   let hasFloatingSidebar = floatingSidebarPresent;
+  let hasHome = homePresent;
+  let hasHomeHeading = homeHeadingPresent;
   let timeoutCalls = 0;
   let textCandidateStyleReads = 0;
   let diffsContainerQueryCount = 0;
@@ -821,13 +1077,34 @@ function createFixture({
   };
   const shellMain = {
     classList: makeClassList(),
+    children: [],
+    appendChild(node) {
+      node.parentElement = shellMain;
+      node.isConnected = true;
+      shellMain.children.push(node);
+      if (node.id) nodes.set(node.id, node);
+      return node;
+    },
+    contains(node) {
+      for (let current = node; current; current = current.parentElement) {
+        if (current === shellMain) return true;
+      }
+      return false;
+    },
+    querySelector(selector) { return shellMain.querySelectorAll(selector)[0] ?? null; },
     querySelectorAll(selector) {
-      if (homeHeadingPresent && selector === 'h1, h2, [role="heading"]') return [homeHeading];
+      if (hasHomeHeading && selector === 'h1, h2, [role="heading"]') return [homeHeading];
+      if (hasHome && selector === '[data-testid="home-icon"]') return [homeIcon];
       return [];
     },
     getBoundingClientRect() {
-      return { left: 290, top: 36, width: 990, height: 784 };
+      return {
+        x: 290, y: 36, left: 290, top: 36,
+        width: 990, height: 764, right: 1280, bottom: 800,
+      };
     },
+    checkVisibility() { return true; },
+    isConnected: true,
   };
   const turnRailClasses = new Set();
   const turnRail = { classList: makeClassList(turnRailClasses) };
@@ -845,6 +1122,7 @@ function createFixture({
   const utilityNode = { classList: makeClassList(utilityClasses) };
   const routeMain = {
     classList: makeClassList(routeClasses),
+    isConnected: true,
     children: [],
     appendChild(node) {
       node.parentElement = routeMain;
@@ -856,10 +1134,28 @@ function createFixture({
       if (selector === '[class*="_homeUtilityBar_"]' && utilityPresent) return [utilityNode];
       return [];
     },
+    getBoundingClientRect() {
+      return { x: 290, y: 36, width: 990, height: 764, right: 1280, bottom: 800 };
+    },
+    checkVisibility() { return true; },
+  };
+  const homeIcon = {
+    nodeType: 1,
+    isConnected: true,
+    closest(selector) { return selector === '[role="main"]' ? routeMain : null; },
+    getBoundingClientRect() {
+      return { x: 340, y: 80, width: 36, height: 36, right: 376, bottom: 116 };
+    },
+    checkVisibility() { return true; },
   };
   const homeHeading = {
     textContent: "我们该构建什么？",
     closest(selector) { return selector === '[role="main"]' ? routeMain : null; },
+    getBoundingClientRect() {
+      return { x: 430, y: 140, width: 420, height: 64, right: 850, bottom: 204 };
+    },
+    checkVisibility() { return true; },
+    isConnected: true,
   };
   const staleHome = { classList: makeClassList(new Set(["dream-home"])) };
   const staleShell = { classList: makeClassList(new Set(["dream-home-shell"])) };
@@ -945,7 +1241,7 @@ function createFixture({
         return hasFloatingSidebar ? floatingSidebar : null;
       }
       if (selector === '[role="main"]:has([data-testid="home-icon"])') {
-        return hasMain && homePresent ? routeMain : null;
+        return hasMain && hasHome ? routeMain : null;
       }
       if (selector === '[role="main"]') return hasMain ? routeMain : null;
       return null;
@@ -1047,7 +1343,7 @@ function createFixture({
     clearInterval: () => {},
     setTimeout: (callback, delay = 0) => {
       timeoutCalls += 1;
-      timeouts.set(timeoutCalls, { callback, delay });
+      timeouts.set(timeoutCalls, { callback, delay, dueAt: clockNow + delay });
       return timeoutCalls;
     },
     clearTimeout: (id) => { timeouts.delete(id); },
@@ -1057,6 +1353,17 @@ function createFixture({
     },
     console: { error() {} },
   };
+  context.window.innerWidth = 1280;
+  context.window.innerHeight = 800;
+  if (fakeClock) {
+    context.performance = { now: () => clockNow };
+    context.window.requestAnimationFrame = (callback) => {
+      animationFrameCalls += 1;
+      animationFrames.set(animationFrameCalls, callback);
+      return animationFrameCalls;
+    };
+    context.window.cancelAnimationFrame = (id) => animationFrames.delete(id);
+  }
   if (analysisFixture) {
     context.Image = class {
       naturalWidth = analysisFixture.naturalWidth;
@@ -1091,13 +1398,38 @@ function createFixture({
     utilityClasses,
     turnRailClasses,
     turnRowParentClasses,
+    shellMain,
+    routeMain,
+    body,
     getTimeoutCalls() { return timeoutCalls; },
     getPendingTimeoutCount() { return timeouts.size; },
     runTimeout(id) {
       const timer = timeouts.get(id);
       timeouts.delete(id);
+      if (fakeClock && timer) clockNow = Math.max(clockNow, timer.dueAt);
       timer?.callback();
     },
+    advanceTime(milliseconds) {
+      assert.equal(fakeClock, true, "advanceTime requires a fake-clock fixture");
+      const target = clockNow + milliseconds;
+      while (true) {
+        const next = [...timeouts.entries()]
+          .filter(([, timer]) => timer.dueAt <= target)
+          .sort((left, right) => left[1].dueAt - right[1].dueAt || left[0] - right[0])[0];
+        if (!next) break;
+        const [id, timer] = next;
+        timeouts.delete(id);
+        clockNow = timer.dueAt;
+        timer.callback();
+      }
+      clockNow = target;
+    },
+    runAnimationFrames() {
+      const pending = [...animationFrames.values()];
+      animationFrames.clear();
+      for (const callback of pending) callback(clockNow);
+    },
+    getClockNow() { return clockNow; },
     getTextCandidateStyleReads() { return textCandidateStyleReads; },
     getDiffsContainerQueryCount() { return diffsContainerQueryCount; },
     getSidebarScrollClosestCalls() { return sidebarScrollClosestCalls; },
@@ -1109,6 +1441,8 @@ function createFixture({
     setFloatingSidebarPresent(value) { hasFloatingSidebar = value; },
     setMainPresent(value) { hasMain = value; },
     setShellMainSelectorPresent(value) { hasShellMainSelector = value; },
+    setHomePresent(value) { hasHome = value; },
+    setHomeHeadingPresent(value) { hasHomeHeading = value; },
   };
 }
 
@@ -1125,6 +1459,76 @@ assert.equal(main.rootClasses.has("dream-theme-dark"), true);
 assert.equal(main.rootClasses.has("dream-art-standard"), true);
 assert.equal(main.rootClasses.has("dream-task-ambient"), true);
 assert.equal(main.routeClasses.has("dream-task"), true);
+
+const scopeBridge = createFixture({ shellPresent: true });
+const bridgeHeader = makeBehaviorNode({
+  tagName: "header",
+  rect: { x: 290, y: 0, width: 990, height: 44 },
+});
+const bridgeSidebar = makeBehaviorNode({
+  tagName: "aside",
+  classes: ["app-shell-left-panel"],
+  rect: { x: 0, y: 0, width: 290, height: 800 },
+});
+const bridgeDocument = scopeBridge.context.document;
+const bridgeQuery = bridgeDocument.querySelector.bind(bridgeDocument);
+const bridgeQueryAll = bridgeDocument.querySelectorAll.bind(bridgeDocument);
+bridgeDocument.querySelector = (selector) => selector === headerSelector
+  ? bridgeHeader
+  : bridgeQuery(selector);
+bridgeDocument.querySelectorAll = (selector) => {
+  if (selector === shellSelector) return [scopeBridge.shellMain];
+  if (selector === sidebarSelector || selector === "aside.app-shell-left-panel") return [bridgeSidebar];
+  if (selector === headerSelector) return [bridgeHeader];
+  return bridgeQueryAll(selector);
+};
+bridgeDocument.visibilityState = "visible";
+bridgeDocument.hidden = false;
+bridgeDocument.adoptedStyleSheets = [];
+Object.assign(bridgeDocument.documentElement, {
+  scrollWidth: 1280,
+  clientWidth: 1280,
+  scrollHeight: 800,
+  clientHeight: 800,
+});
+scopeBridge.context.innerWidth = 1280;
+scopeBridge.context.innerHeight = 800;
+installComputedStyleBridge(scopeBridge);
+vm.runInNewContext(payload, scopeBridge.context);
+const rendererScope = scopeBridge.context.window.__CODEX_DREAM_SKIN_STATE__.scope;
+const normalizedRendererScope = {
+  ...rendererScope,
+  missingL1: [...rendererScope.missingL1],
+};
+assert.deepEqual(normalizedRendererScope, {
+  level: "L1",
+  baseState: "fork-windows",
+  missingL1: [],
+}, "The actual renderer output must expose an empty missingL1 array for a complete shell.");
+const bridgeSession = {
+  async send(method) {
+    if (method === "Browser.getWindowForTarget") {
+      return { windowId: 73, bounds: { width: 1280, height: 800, windowState: "normal" } };
+    }
+    if (method === "Browser.getWindowBounds") {
+      return { bounds: { width: 1280, height: 800, windowState: "normal" } };
+    }
+    throw new Error(`Unexpected bridge CDP method: ${method}`);
+  },
+  async evaluate(expression) { return vm.runInNewContext(expression, scopeBridge.context); },
+};
+const bridgedReadiness = await verifySession(
+  bridgeSession,
+  "renderer-scope-bridge",
+  scopeBridge.context.window.__CODEX_DREAM_SKIN_STATE__.themeId,
+  scopeBridge.context.window.__CODEX_DREAM_SKIN_STATE__.revision,
+);
+assert.equal(bridgedReadiness.pass, true,
+  `verifySession must accept the real renderer missingL1 output without a hand-authored scope stub: ${JSON.stringify(bridgedReadiness)}`);
+assert.deepEqual({
+  ...bridgedReadiness.scope,
+  missingL1: [...bridgedReadiness.scope.missingL1],
+}, normalizedRendererScope);
 
 const scopedSettings = createFixture({ shellPresent: true, settingsPresent: true });
 vm.runInNewContext(payload, scopedSettings.context);
@@ -1180,6 +1584,358 @@ dynamicSidebarPart.observers[0].callback([{
 }]);
 assert.equal(dynamicSidebarPart.floatingSidebar.getAttribute("data-ds-part"), null,
   "Windows must clear the public part immediately when the floating portal unmounts");
+
+const emptyComposerRoot = makeBehaviorNode({ classes: ["CompactComposerLayoutRoot"] });
+const misleadingFooter = makeBehaviorNode({ classes: ["ComposerLayoutFooter"] });
+const misleadingToolbar = makeBehaviorNode({ classes: ["ComposerLayoutToolbar"] });
+const misleadingEditor = makeBehaviorNode({ classes: ["ComposerLayoutEditor"] });
+const standaloneTextbox = makeBehaviorNode({ attributes: { role: "textbox" } });
+const emptyComposerShell = makeBehaviorNode({ classes: ["composer-shell"] });
+const genericComposerNegatives = createFixture({ shellPresent: true });
+installGenericComposerDom(genericComposerNegatives, {
+  roots: [emptyComposerRoot],
+  inputs: [standaloneTextbox],
+  extraNodes: [misleadingFooter, misleadingToolbar, misleadingEditor, emptyComposerShell],
+});
+vm.runInNewContext(payload, genericComposerNegatives.context);
+for (const [label, node] of [
+  ["empty ComposerLayoutRoot", emptyComposerRoot],
+  ["ComposerLayoutFooter", misleadingFooter],
+  ["ComposerLayoutToolbar", misleadingToolbar],
+  ["ComposerLayoutEditor", misleadingEditor],
+  ["standalone textbox", standaloneTextbox],
+  ["empty composer shell", emptyComposerShell],
+]) {
+  assert.equal(node.getAttribute("data-ds-part"), null,
+    `${label} must not become a public composer without an associated rendered input.`);
+}
+
+const compactComposer = makeBehaviorNode({ classes: ["CompactComposerLayoutRoot"] });
+const compactInput = makeBehaviorNode({
+  attributes: { role: "textbox", contenteditable: "true" },
+  rect: { x: 240, y: 650, width: 620, height: 72 },
+});
+compactComposer.appendChild(compactInput);
+const sideTerminalComposer = makeBehaviorNode({
+  tagName: "aside",
+  classes: ["side-terminal-panel"],
+  rect: { x: 900, y: 120, width: 340, height: 560 },
+});
+const sideTerminalInput = makeBehaviorNode({
+  tagName: "textarea",
+  rect: { x: 930, y: 590, width: 280, height: 60 },
+});
+sideTerminalComposer.appendChild(sideTerminalInput);
+const genericComposerPositives = createFixture({ shellPresent: true });
+installGenericComposerDom(genericComposerPositives, {
+  roots: [compactComposer, sideTerminalComposer],
+  inputs: [compactInput, sideTerminalInput],
+});
+vm.runInNewContext(payload, genericComposerPositives.context);
+assert.equal(compactComposer.getAttribute("data-ds-part"), "composer",
+  "A compact ComposerLayoutRoot with its own visible textbox must be exposed as the composer part.");
+assert.equal(sideTerminalComposer.getAttribute("data-ds-part"), "composer",
+  "A side terminal composer with an associated visible textarea must remain supported.");
+assert.equal(compactInput.getAttribute("data-ds-part"), null,
+  "The public composer part must stay on the stable owner instead of leaking onto its editor.");
+
+const hiddenCanonicalComposer = makeBehaviorNode({
+  classes: ["composer-surface-chrome"],
+  visible: false,
+  rect: { x: -100, y: -100, width: 0, height: 0 },
+});
+const terminalBesideCanonical = makeBehaviorNode({
+  tagName: "aside",
+  classes: ["secondary-terminal-panel"],
+});
+const terminalBesideCanonicalInput = makeBehaviorNode({ tagName: "textarea" });
+terminalBesideCanonical.appendChild(terminalBesideCanonicalInput);
+const staleCanonicalFixture = createFixture({ shellPresent: true });
+installGenericComposerDom(staleCanonicalFixture, {
+  roots: [terminalBesideCanonical],
+  inputs: [terminalBesideCanonicalInput],
+  extraNodes: [hiddenCanonicalComposer],
+});
+vm.runInNewContext(payload, staleCanonicalFixture.context);
+assert.equal(terminalBesideCanonical.getAttribute("data-ds-part"), "composer",
+  "A hidden stale canonical composer elsewhere must not globally suppress a visible terminal composer.");
+
+const dynamicCompactComposer = makeBehaviorNode({ classes: ["DynamicComposerLayoutRoot"] });
+const dynamicCompactInput = makeBehaviorNode({ attributes: { role: "textbox" } });
+dynamicCompactComposer.appendChild(dynamicCompactInput);
+const dynamicComposerFixture = createFixture({ shellPresent: true });
+const dynamicComposerDom = installGenericComposerDom(dynamicComposerFixture, {
+  roots: [dynamicCompactComposer],
+  inputs: [dynamicCompactInput],
+});
+vm.runInNewContext(payload, dynamicComposerFixture.context);
+assert.equal(dynamicCompactComposer.getAttribute("data-ds-part"), "composer");
+const invalidDynamicLookalike = makeBehaviorNode({ classes: ["LateComposerLayoutRoot"] });
+dynamicComposerDom.addNodes({ roots: [invalidDynamicLookalike] });
+dynamicComposerFixture.observers[0].callback([{
+  type: "childList",
+  target: dynamicComposerFixture.shellMain,
+  addedNodes: [invalidDynamicLookalike],
+  removedNodes: [],
+}]);
+for (let steps = 0; dynamicComposerFixture.timeouts.size && steps < 8; steps += 1) {
+  const [id] = [...dynamicComposerFixture.timeouts.entries()]
+    .sort((left, right) => left[1].dueAt - right[1].dueAt)[0];
+  dynamicComposerFixture.runTimeout(id);
+}
+assert.equal(invalidDynamicLookalike.getAttribute("data-ds-part"), null,
+  "A dynamically mounted composer lookalike without an associated input must remain unmarked.");
+const dynamicSideTerminal = makeBehaviorNode({
+  tagName: "aside",
+  classes: ["late-terminal-panel"],
+});
+const dynamicSideTerminalInput = makeBehaviorNode({ tagName: "textarea" });
+dynamicSideTerminal.appendChild(dynamicSideTerminalInput);
+dynamicComposerDom.addNodes({
+  roots: [dynamicSideTerminal],
+  inputs: [dynamicSideTerminalInput],
+});
+dynamicComposerFixture.observers[0].callback([{
+  type: "childList",
+  target: dynamicComposerFixture.shellMain,
+  addedNodes: [dynamicSideTerminal],
+  removedNodes: [],
+}]);
+for (let steps = 0; dynamicComposerFixture.timeouts.size && steps < 8; steps += 1) {
+  const [id] = [...dynamicComposerFixture.timeouts.entries()]
+    .sort((left, right) => left[1].dueAt - right[1].dueAt)[0];
+  dynamicComposerFixture.runTimeout(id);
+}
+assert.equal(dynamicSideTerminal.getAttribute("data-ds-part"), "composer",
+  "A second side terminal mounted after a compact composer must trigger a full validated refresh.");
+assert.equal(dynamicCompactComposer.getAttribute("data-ds-part"), "composer",
+  "Classifying a late side terminal must preserve the already valid compact composer.");
+
+const hiddenOnlyItem = makeBehaviorNode({
+  tagName: "button",
+  attributes: { "data-testid": "home-suggestion-stale" },
+  visible: false,
+  rect: { x: 30, y: 280, width: 0, height: 0 },
+});
+const hiddenOnlyDeck = makeBehaviorNode({ classes: ["native-deck-layout"] });
+hiddenOnlyDeck.appendChild(hiddenOnlyItem);
+const hiddenOnlyHome = createFixture({ shellPresent: true });
+installHomeSuggestionDom(hiddenOnlyHome, { deck: hiddenOnlyDeck });
+vm.runInNewContext(payload, hiddenOnlyHome.context);
+assert.equal(hiddenOnlyHome.rootAttributes.get("data-dream-route"), "task",
+  "A stale hidden broad home-suggestion match must not keep the renderer on Home.");
+
+const hiddenFirstItem = makeBehaviorNode({
+  tagName: "button",
+  attributes: { "data-testid": "home-suggestion-stale" },
+  visible: false,
+  rect: { x: 30, y: 280, width: 0, height: 0 },
+});
+const visibleSecondItem = makeBehaviorNode({
+  tagName: "button",
+  attributes: { "data-testid": "home-suggestion-current" },
+  rect: { x: 290, y: 280, width: 220, height: 84 },
+});
+const multiSignalDeck = makeBehaviorNode({ classes: ["native-deck-layout"] });
+multiSignalDeck.appendChild(hiddenFirstItem);
+multiSignalDeck.appendChild(visibleSecondItem);
+const multipleHomeSignals = createFixture({ shellPresent: true });
+installHomeSuggestionDom(multipleHomeSignals, { deck: multiSignalDeck });
+vm.runInNewContext(payload, multipleHomeSignals.context);
+assert.equal(multipleHomeSignals.rootAttributes.get("data-dream-route"), "home",
+  "Home detection must scan past the first hidden broad testid to a later visible signal.");
+
+const semanticGrid = makeBehaviorNode({
+  attributes: { "data-testid": "home-suggestions-grid" },
+  classes: ["native-grid-layout"],
+});
+semanticGrid.appendChild(makeBehaviorNode({ tagName: "button" }));
+semanticGrid.appendChild(makeBehaviorNode({
+  tagName: "button",
+  rect: { x: 360, y: 300, width: 260, height: 90 },
+}));
+const semanticGridHome = createFixture({ shellPresent: true });
+const semanticGridDom = installHomeSuggestionDom(semanticGridHome, { deck: semanticGrid });
+vm.runInNewContext(payload, semanticGridHome.context);
+assert.equal(semanticGrid.classList.contains("dream-native-suggestions-root"), true,
+  "A broad semantic home-suggestions-grid container must mark itself as the normalized deck root.");
+assert.equal(semanticGridDom.wrapper.classList.contains("dream-native-suggestions-root"), false,
+  "Semantic container normalization must not climb to and hide the whole Home wrapper.");
+
+const unsafeSignalOne = makeBehaviorNode({
+  tagName: "button",
+  attributes: { "data-testid": "home-suggestion-one" },
+});
+const unsafeSignalTwo = makeBehaviorNode({
+  tagName: "button",
+  attributes: { "data-testid": "home-suggestion-two" },
+  rect: { x: 360, y: 300, width: 260, height: 90 },
+});
+const unsafeCommonRootHome = createFixture({ shellPresent: true });
+const unsafeCommonRootDom = installHomeSuggestionDom(unsafeCommonRootHome, {
+  signals: [unsafeSignalOne, unsafeSignalTwo],
+});
+const siblingGenericComposer = makeBehaviorNode({ classes: ["SiblingComposerLayoutRoot"] });
+const siblingGenericInput = makeBehaviorNode({ attributes: { role: "textbox" } });
+siblingGenericComposer.appendChild(siblingGenericInput);
+const siblingHomeHeading = makeBehaviorNode({
+  tagName: "h1",
+  text: "What should we build?",
+});
+unsafeCommonRootDom.wrapper.appendChild(siblingGenericComposer);
+unsafeCommonRootDom.wrapper.appendChild(siblingHomeHeading);
+vm.runInNewContext(payload, unsafeCommonRootHome.context);
+assert.equal(unsafeCommonRootDom.wrapper.classList.contains("dream-native-suggestions-root"), false,
+  "A common suggestion parent that would swallow a generic composer and Home heading must be rejected.");
+assert.equal(siblingGenericComposer.classList.contains("dream-native-suggestions-root"), false);
+assert.equal(siblingHomeHeading.classList.contains("dream-native-suggestions-root"), false);
+assert.equal(unsafeCommonRootHome.rootClasses.has("dream-presets-ready"), true,
+  "Unsafe root normalization must fail closed and keep fallback cards active.");
+assert.equal(unsafeCommonRootHome.observers[0].observations.some(
+  ({ target, options }) => target === unsafeCommonRootHome.shellMain && options.subtree === true,
+), true, "Without a safe deck root, the renderer must continue the temporary deep Home probe.");
+
+const hiddenStaleSuggestionRoot = makeBehaviorNode({
+  classes: ["group/home-suggestions", "dream-native-suggestions-root"],
+  visible: false,
+  rect: { x: -200, y: -200, width: 0, height: 0 },
+});
+const delayedSuggestionHome = createFixture({ shellPresent: true });
+const delayedHomeDom = installHomeSuggestionDom(delayedSuggestionHome, {
+  includeHomeIcon: true,
+  deck: hiddenStaleSuggestionRoot,
+});
+vm.runInNewContext(payload, delayedSuggestionHome.context);
+assert.equal(delayedSuggestionHome.rootClasses.has("dream-presets-ready"), true,
+  "Home without native suggestions must expose the fallback deck while Codex finishes mounting.");
+assert.equal(hiddenStaleSuggestionRoot.classList.contains("dream-native-suggestions-root"), false,
+  "A hidden stale native root must lose the managed marker and cannot capture the observer.");
+let delayedHomeObservation = delayedSuggestionHome.observers[0].observations.find(
+  ({ target }) => target === delayedSuggestionHome.shellMain,
+);
+assert.equal(delayedHomeObservation?.options?.subtree, true,
+  "While fallback is active and no native deck exists, the active Home shell must be observed deeply.");
+const lateDeck = makeBehaviorNode({ classes: ["late-native-deck"] });
+lateDeck.appendChild(makeBehaviorNode({
+  tagName: "button",
+  attributes: { "data-testid": "home-suggestion-one" },
+}));
+lateDeck.appendChild(makeBehaviorNode({
+  tagName: "button",
+  attributes: { "data-testid": "home-suggestion-two" },
+  rect: { x: 360, y: 300, width: 260, height: 90 },
+}));
+delayedHomeDom.mountSuggestionDeck(lateDeck);
+const ensureBeforeLateDeck = delayedSuggestionHome.context.window
+  .__CODEX_DREAM_SKIN_STATE__.metrics.ensureCount;
+delayedSuggestionHome.observers[0].callback([{
+  type: "childList",
+  target: delayedHomeDom.wrapper,
+  addedNodes: [lateDeck],
+  removedNodes: [],
+}]);
+assert.equal([...delayedSuggestionHome.timeouts.values()].some(({ delay }) => delay < 60000), true,
+  "A native deck mounted under an existing deep wrapper must schedule an immediate reconcile.");
+for (let steps = 0; delayedSuggestionHome.timeouts.size && steps < 8; steps += 1) {
+  const [id] = [...delayedSuggestionHome.timeouts.entries()]
+    .sort((left, right) => left[1].dueAt - right[1].dueAt)[0];
+  delayedSuggestionHome.runTimeout(id);
+}
+assert.ok(delayedSuggestionHome.context.window.__CODEX_DREAM_SKIN_STATE__.metrics.ensureCount >
+  ensureBeforeLateDeck,
+"The deep-wrapper mutation must execute ensure rather than waiting for the 60-second fallback probe.");
+assert.equal(lateDeck.classList.contains("dream-native-suggestions-root"), true,
+  "Item-level suggestion signals must normalize to and mark their stable deck parent.");
+assert.equal(delayedSuggestionHome.rootClasses.has("dream-presets-ready"), false,
+  "Two self-matching native buttons must be counted and retire the generated fallback deck.");
+delayedHomeObservation = delayedSuggestionHome.observers[0].observations.find(
+  ({ target }) => target === lateDeck,
+);
+assert.equal(delayedHomeObservation?.options?.subtree, true,
+  "After normalization, the observer must narrow to the stable native deck and watch sibling changes.");
+
+const replacedOldRoot = makeBehaviorNode({ classes: ["group/home-suggestions"] });
+replacedOldRoot.appendChild(makeBehaviorNode({ tagName: "button" }));
+replacedOldRoot.appendChild(makeBehaviorNode({
+  tagName: "button",
+  rect: { x: 360, y: 300, width: 260, height: 90 },
+}));
+const replacedRootHome = createFixture({ shellPresent: true });
+const replacedRootDom = installHomeSuggestionDom(replacedRootHome, {
+  includeHomeIcon: true,
+  deck: replacedOldRoot,
+});
+vm.runInNewContext(payload, replacedRootHome.context);
+assert.equal(replacedOldRoot.classList.contains("dream-native-suggestions-root"), true);
+assert.equal(replacedRootHome.rootClasses.has("dream-presets-ready"), false);
+const parentChainObservation = replacedRootHome.observers[0].observations.find(
+  ({ target }) => target === replacedRootDom.wrapper,
+);
+assert.equal(parentChainObservation?.options?.childList, true,
+  "The observer must watch each existing root-to-Home parent boundary.");
+assert.equal(parentChainObservation?.options?.subtree, undefined,
+  "Parent-chain observation must not subscribe to unrelated descendants.");
+const replacedNewRoot = makeBehaviorNode({
+  attributes: { "data-testid": "home-suggestions-grid" },
+});
+replacedNewRoot.appendChild(makeBehaviorNode({ tagName: "button" }));
+replacedOldRoot.remove();
+replacedRootDom.mountSuggestionDeck(replacedNewRoot);
+replacedRootHome.observers[0].callback([{
+  type: "childList",
+  target: replacedRootDom.wrapper,
+  addedNodes: [replacedNewRoot],
+  removedNodes: [replacedOldRoot],
+}]);
+for (let steps = 0; replacedRootHome.timeouts.size && steps < 8; steps += 1) {
+  const [id] = [...replacedRootHome.timeouts.entries()]
+    .sort((left, right) => left[1].dueAt - right[1].dueAt)[0];
+  replacedRootHome.runTimeout(id);
+}
+assert.equal(replacedNewRoot.classList.contains("dream-native-suggestions-root"), true,
+  "Replacing the entire React deck root must trigger ensure and transfer the managed marker.");
+assert.equal(replacedRootHome.rootClasses.has("dream-presets-ready"), true,
+  "A replacement root with only one native button must reactivate the fallback deck.");
+assert.equal(replacedRootHome.observers[0].observations.some(
+  ({ target, options }) => target === replacedNewRoot && options.subtree === true,
+), true, "After replacement, deep observation must move to the new active root.");
+
+const oneItemDeck = makeBehaviorNode({ classes: ["item-level-deck"] });
+oneItemDeck.appendChild(makeBehaviorNode({
+  tagName: "button",
+  attributes: { "data-testid": "home-suggestion-one" },
+}));
+const siblingMutationHome = createFixture({ shellPresent: true });
+const siblingMutationDom = installHomeSuggestionDom(siblingMutationHome, { deck: oneItemDeck });
+vm.runInNewContext(payload, siblingMutationHome.context);
+assert.equal(oneItemDeck.classList.contains("dream-native-suggestions-root"), true);
+assert.equal(siblingMutationHome.rootClasses.has("dream-presets-ready"), true,
+  "One native item must still show the generated fallback instead of being mistaken for a complete deck.");
+const siblingItem = makeBehaviorNode({
+  tagName: "button",
+  attributes: { "data-testid": "home-suggestion-two" },
+  rect: { x: 360, y: 300, width: 260, height: 90 },
+});
+oneItemDeck.appendChild(siblingItem);
+siblingMutationHome.observers[0].callback([{
+  type: "childList",
+  target: oneItemDeck,
+  addedNodes: [siblingItem],
+  removedNodes: [],
+}]);
+for (let steps = 0; siblingMutationHome.timeouts.size && steps < 8; steps += 1) {
+  const [id] = [...siblingMutationHome.timeouts.entries()]
+    .sort((left, right) => left[1].dueAt - right[1].dueAt)[0];
+  siblingMutationHome.runTimeout(id);
+}
+assert.equal(siblingMutationHome.rootClasses.has("dream-presets-ready"), false,
+  "A sibling mutation in the managed deck must be observed and count each button itself.");
+assert.match(css,
+  /\.dream-presets-ready[\s\S]*?\.dream-native-suggestions-root\s*\{[^}]*display:\s*none\s*!important[^}]*pointer-events:\s*none\s*!important/s,
+  "Fallback activation must hide only the renderer-managed normalized native deck root.");
+assert.doesNotMatch(css,
+  /\.dream-presets-ready[^{]*(?:data-testid\*="home-suggestion"|data-feature="home-suggestions")[^{]*\{/s,
+  "Fallback CSS must not hide broad item-level signals or unrelated native layout nodes directly.");
 
 for (const [platform, rendererTemplate] of [
   ["windows", template],
@@ -1491,6 +2247,72 @@ assert.equal([...navigationRefresh.timeouts.values()].some(({ delay }) => delay 
 navigationRefresh.context.window.__CODEX_DREAM_SKIN_STATE__.cleanup();
 assert.equal([...navigationRefresh.timeouts.values()].some(({ delay }) => delay === 48), false,
   "Cleanup must cancel a pending navigation refresh.");
+
+const confirmedNavigation = createFixture({ shellPresent: true, fakeClock: true });
+const confirmedNavigationDom = installHomeSuggestionDom(confirmedNavigation, {
+  includeHomeIcon: true,
+});
+vm.runInNewContext(payload, confirmedNavigation.context);
+assert.equal(confirmedNavigation.rootAttributes.get("data-dream-route"), "home");
+const confirmedNavigationState = confirmedNavigation.context.window.__CODEX_DREAM_SKIN_STATE__;
+confirmedNavigationState.navigationHandler({
+  type: "click",
+  target: {
+    closest(selector) {
+      return selector.includes("[data-app-action-sidebar-thread-row]") ? this : null;
+    },
+  },
+});
+assert.equal([...confirmedNavigation.timeouts.values()].some(({ delay }) => delay === 48), true,
+  "Navigation must retain the fast post-commit probe.");
+assert.equal([...confirmedNavigation.timeouts.values()].some(({ delay }) => delay === 360), true,
+  "Navigation must also schedule a bounded second confirmation for late Codex commits.");
+confirmedNavigation.advanceTime(48);
+confirmedNavigation.advanceTime(64);
+confirmedNavigation.runAnimationFrames();
+assert.equal(confirmedNavigation.rootAttributes.get("data-dream-route"), "home",
+  "The fast confirmation may still observe the pre-navigation Home DOM.");
+confirmedNavigation.advanceTime(153);
+assert.equal(confirmedNavigation.getClockNow(), 265);
+confirmedNavigationDom.homeIcon.remove();
+confirmedNavigation.advanceTime(95);
+confirmedNavigation.advanceTime(64);
+confirmedNavigation.runAnimationFrames();
+assert.equal(confirmedNavigation.rootAttributes.get("data-dream-route"), "task",
+  "The 360ms confirmation must correct a route whose DOM committed after the fast pass.");
+assert.equal(confirmedNavigation.shellMain.classList.contains("dream-route-home"), false);
+assert.equal(confirmedNavigation.shellMain.classList.contains("dream-route-task"), true);
+assert.equal(confirmedNavigation.shellMain.classList.contains("dream-home-shell"), false);
+
+const rapidNavigation = createFixture({ shellPresent: true, fakeClock: true });
+const rapidNavigationDom = installHomeSuggestionDom(rapidNavigation, { includeHomeIcon: true });
+vm.runInNewContext(payload, rapidNavigation.context);
+const rapidNavigationState = rapidNavigation.context.window.__CODEX_DREAM_SKIN_STATE__;
+const routeClick = {
+  type: "click",
+  target: {
+    closest(selector) {
+      return selector.includes("[data-app-action-sidebar-thread-row]") ? this : null;
+    },
+  },
+};
+rapidNavigationState.navigationHandler(routeClick);
+const firstConfirmId = [...rapidNavigation.timeouts.entries()]
+  .find(([, timer]) => timer.delay === 360)?.[0];
+assert.ok(firstConfirmId, "The first navigation must own one delayed confirmation timer.");
+rapidNavigation.advanceTime(10);
+rapidNavigationState.navigationHandler(routeClick);
+assert.equal(rapidNavigation.timeouts.has(firstConfirmId), false,
+  "A rapid second navigation must cancel the stale first confirmation.");
+assert.equal([...rapidNavigation.timeouts.values()].filter(({ delay }) => delay === 360).length, 1,
+  "Rapid route changes must retain exactly one latest confirmation.");
+rapidNavigationDom.homeIcon.remove();
+rapidNavigation.advanceTime(424);
+rapidNavigation.runAnimationFrames();
+assert.equal(rapidNavigation.rootAttributes.get("data-dream-route"), "task");
+rapidNavigationState.cleanup();
+assert.equal([...rapidNavigation.timeouts.values()].some(({ delay }) => delay === 360), false,
+  "Cleanup must cancel the delayed route confirmation as well as the fast timer.");
 
 const irrelevantTextCandidates = Array.from({ length: 1000 }, () => ({
   textContent: "ordinary streaming response content",

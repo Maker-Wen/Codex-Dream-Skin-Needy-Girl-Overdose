@@ -1,5 +1,85 @@
 # Task Progress
 
+Updated: 2026-08-09 CST (Asia/Shanghai)
+
+## v1.5.13 Issue #14/#16 completion and release
+
+- [goal] Resolve the remaining PR #23 CI/review defects, finish and verify
+  Issue #14 and #16 on the exact release candidate, merge only after fresh CI
+  and approval, then publish and independently verify immutable v1.5.13 assets.
+- [workspace] Isolated worktree on `codex/fix-pr23-v1.5.13-resume` at PR #23
+  head `18e51bb`. The primary
+  worktree's `.gitignore`, `TASK_PROGRESS.md`, and `.codegraph/` changes remain
+  untouched.
+- [recovery] The previous temporary worktree was cleaned by the host between
+  sessions, including all uncommitted files. Its branch remained at `18e51bb`;
+  a fresh isolated worktree was created from that exact commit and the audited
+  fixes are being rebuilt from the recorded findings and test evidence.
+- [remote] On 2026-08-09, PR #23 remains open at `18e51bb` with the original
+  PowerShell 7 contention-test failure and review required. Issues #14 and #16
+  remain open. The latest public Release remains v1.5.12.
+- [diagnosed] Issue #14 still needs visible Home-signal selection, responsive
+  native suggestion lifecycle handling, delayed container observation, a
+  fail-closed generic composer fallback, and a real delayed navigation
+  confirmation. Issue #16's renderer/verifier `missingL1` repair is already in
+  main but needs an executable renderer-to-verifier regression and startup
+  retry success coverage before its first public release.
+- [complete] Rebuilt the Windows renderer/CSS/verifier fixes. Home routing now
+  uses visible candidates and a fast plus 360 ms confirmation; native 2–4 card
+  lifecycle handling normalizes only a safe deck root, handles late mount and
+  whole-root replacement, and removes fallback layout gaps. Generic composer
+  discovery validates each visible owner/input and cannot be bypassed by stale
+  canonical nodes or incremental classification.
+- [complete] Restored executable mode 100755 for the Linux and macOS common
+  scripts, corrected platform-specific changelog text, merged duplicate fix
+  sections, and replaced the stale version-only progress entry.
+- [complete] Added a bounded retry around the same-volume Windows runtime
+  directory rename. It retries only transient access/IO errors while the source
+  and destination still prove that no rename committed; every ambiguous state
+  remains fail closed. Fault injection verifies both retry and exact rollback.
+- [verified] Renderer behavior and renderer-to-verifier contract tests pass;
+  verifier readiness is 14/14. Startup failure rollback plus two-fail/third-pass
+  retry tests pass in PowerShell 7 and Windows PowerShell 5.1. The real Global
+  mutex contention probe passes same-engine in both hosts and cross-engine from
+  PowerShell 7 to Windows PowerShell. Payload, bootstrap, session, one-shot,
+  Home CSS, JavaScript syntax, and diff whitespace checks pass.
+- [reviewed] An independent production-only audit found and then verified fixes
+  for hidden stale deck observer narrowing, unsafe deck-parent normalization,
+  whole-root replacement observation, canonical/generic multi-composer
+  coexistence, and renderer/verifier opacity consistency. No P0/P1/P2 finding
+  remains in the three production files.
+- [verified] The complete Windows suite passes in PowerShell 7 (658.1 s) and
+  Windows PowerShell 5.1 (547 s). Focused runtime-patch tests pass in both hosts
+  after the bounded rename retry. Windows portable Node tests pass 26/26 and
+  installer-static tests pass in both hosts. Shared runtime sync, all three
+  platform payload checks, Internet Angel consistency, macOS shell syntax, all
+  JavaScript syntax, PowerShell source encoding, runtime safety, six-source
+  version consistency, and `git diff --check` pass.
+- [platform note] On Windows, the macOS portable suite records 58 passes and 2
+  expected skips; 5 cases require POSIX `/tmp` or macOS window tooling and are
+  intentionally left to exact-head macOS CI. Native Swift/DMG and signed Setup
+  build validation, release asset checksums, and real Codex smoke remain release
+  gates and are not claimed locally.
+- [pending] Stage and commit the reviewed diff, update PR #23, require fresh
+  exact-head CI and approval, merge, verify the public v1.5.13 tag and all three
+  immutable assets, then comment on and close Issues #14/#16.
+
+Updated: 2026-08-07 CST (Asia/Shanghai)
+
+## Initial v1.5.13 preparation (superseded)
+
+- [historical] PR #23 initially prepared the 18 commits between public
+  `v1.5.12@bf9ca31` and `main@8f9c99a`, including Codex 26.730 compatibility,
+  stale-listener recovery, runtime patch support, wallpaper/auxiliary-route
+  coverage, and renderer performance follow-ups.
+- [complete] The guarded macOS/Windows version sources, synchronized Linux
+  sources, package metadata, README labels, and changelogs were raised to
+  1.5.13 without changing or replacing the immutable v1.5.12 Release.
+- [superseded] This was originally a version-only publication. The 2026-08-09
+  section is authoritative: Issue #14/#16 completion, fresh exact-head CI,
+  approval, merge, release verification, and Issue closure are now part of the
+  same delivery.
+
 Updated: 2026-08-05 CST (Asia/Shanghai)
 
 ## Codex 26.730 generic composer fix

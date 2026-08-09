@@ -39,7 +39,7 @@ const stableTestidLiteral = (testid) => {
   }
   return JSON.stringify(`[data-testid="${testid}"]`);
 };
-const SKIN_VERSION = "1.5.12";
+const SKIN_VERSION = "1.5.13";
 const INTERNET_ANGEL_EXTENSION_THEME_IDS = new Set([
   "preset-internet-angel",
   "preset-internet-angel-default",
@@ -1380,7 +1380,7 @@ export async function verifySession(
       const bottom = Number.isFinite(r.bottom) ? r.bottom : r.y + r.height;
       let cssVisible = r.width > 0 && r.height > 0 && style.display !== 'none' &&
         style.visibility !== 'hidden' && style.visibility !== 'collapse' &&
-        style.contentVisibility !== 'hidden' && (!Number.isFinite(opacity) || opacity > 0);
+        style.contentVisibility !== 'hidden' && (!Number.isFinite(opacity) || opacity > .05);
       try {
         if (typeof node.checkVisibility === 'function') {
           cssVisible = cssVisible && node.checkVisibility({
@@ -1396,17 +1396,47 @@ export async function verifySession(
         visible: Boolean(node.isConnected !== false && cssVisible && intersectsViewport),
       };
     };
-    const homeIndicator = document.querySelector(${selectorLiteral("home-icon")});
-    const homeSignal = homeIndicator ?? document.querySelector(${selectorLiteral("game-source")}) ??
-      document.querySelector(${selectorLiteral("home-suggestions")});
+    const queryAll = (selector, root = document) => {
+      try { return [...root.querySelectorAll(selector)]; } catch { return []; }
+    };
+    const queryAllIncludingRoot = (root, selector) => {
+      if (!root) return [];
+      const matches = [];
+      try {
+        if (root.matches?.(selector)) matches.push(root);
+        for (const node of root.querySelectorAll?.(selector) || []) {
+          if (!matches.includes(node)) matches.push(node);
+        }
+      } catch {}
+      return matches;
+    };
+    const firstVisible = (nodes) => nodes.find((node) => box(node)?.visible) ?? null;
+    const homeSignal = firstVisible([
+      ...queryAll(${selectorLiteral("home-icon")}),
+      ...queryAll(${selectorLiteral("game-source")}),
+      ...queryAll(${selectorLiteral("home-suggestions")}),
+      ...queryAll('[data-feature="home-suggestions"], [data-testid*="home-suggestion" i]'),
+    ]);
     const homeRoute = homeSignal?.closest('[role="main"]') ?? null;
-    // Codex 26.721.x can render semantic home content before home-icon.
-    const home = document.querySelector(${selectorLiteral("home-route")}) ?? homeRoute;
+    const visibleShell = firstVisible(queryAll(${selectorLiteral("shell-main")}));
+    const home = homeSignal && box(homeRoute)?.visible
+      ? homeRoute
+      : (homeSignal && visibleShell ? visibleShell : null);
     const settingsAnchor = document.querySelector(${selectorLiteral("settings-panel")}) ||
       document.querySelector(${selectorLiteral("appearance-radio")}) ||
       document.querySelector(${stableTestidLiteral("theme-preview")});
-    const suggestions = home?.querySelector(${selectorLiteral("home-suggestions")}) ?? null;
-    const cardButtons = suggestions ? [...suggestions.querySelectorAll('button')] : [];
+    const suggestionCandidates = home ? queryAllIncludingRoot(home, [
+      '.dream-native-suggestions-root',
+      ${selectorLiteral("home-suggestions")},
+      '[data-feature="home-suggestions"]',
+      '[data-testid*="home-suggestion" i]',
+      '#codex-dream-skin-presets[data-dream-ready="true"]',
+    ].join(', ')) : [];
+    const suggestions = firstVisible(suggestionCandidates);
+    const cardButtons = suggestions ? [
+      ...(suggestions.matches?.('button') ? [suggestions] : []),
+      ...suggestions.querySelectorAll('button'),
+    ] : [];
     const cards = cardButtons.map(box);
     const visibleCards = cards.filter((item) => item?.visible);
     const suggestionLabels = cardButtons.flatMap((button) => {
@@ -1468,12 +1498,12 @@ export async function verifySession(
       visibleCardCount: visibleCards.length,
       suggestionLabels,
       suggestionLabelColorsMatch,
-      composer: box(document.querySelector(${selectorLiteral("composer-chrome")})),
-      shell: box(document.querySelector(${selectorLiteral("shell-main")})),
-      sidebar: box(document.querySelector(${selectorLiteral("left-panel")})),
-      header: box(document.querySelector(${selectorLiteral("header-tint")})),
-      genericMain: box(document.querySelector('[data-ds-part="main"], [data-ds-part="home"]')),
-      genericInput: box(document.querySelector('[data-ds-part="composer"]')),
+      composer: box(firstVisible(queryAll(${selectorLiteral("composer-chrome")}))),
+      shell: box(visibleShell),
+      sidebar: box(firstVisible(queryAll(${selectorLiteral("left-panel")}))),
+      header: box(firstVisible(queryAll(${selectorLiteral("header-tint")}))),
+      genericMain: box(firstVisible(queryAll('[data-ds-part="main"], [data-ds-part="home"]'))),
+      genericInput: box(firstVisible(queryAll('[data-ds-part="composer"]'))),
       nativeWindow: ${JSON.stringify(nativeWindow)},
       documentVisibility: document.visibilityState ?? null,
       documentHidden: document.hidden === true,

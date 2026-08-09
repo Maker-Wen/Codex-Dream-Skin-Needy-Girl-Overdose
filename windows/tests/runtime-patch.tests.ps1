@@ -235,23 +235,28 @@ try {
   $failurePatch = Join-Path $failureSourceRoot 'scripts\patch-dream-skin.ps1'
   $failurePatchText = [System.IO.File]::ReadAllText($failurePatch)
   $errorPreferenceNeedle = '$ErrorActionPreference = ''Stop'''
-  $directoryMoveNeedle = '  [System.IO.Directory]::Move($sourceFull, $destinationFull)'
+  $directoryMoveNeedle = '      [System.IO.Directory]::Move($sourceFull, $destinationFull)'
   if (-not $failurePatchText.Contains($errorPreferenceNeedle) -or
     -not $failurePatchText.Contains($directoryMoveNeedle)) {
     throw 'Could not install the forced atomic swap failure seam in the patch fixture.'
   }
   $failurePatchText = $failurePatchText.Replace(
     $errorPreferenceNeedle,
-    "$errorPreferenceNeedle`r`n`$script:DreamSkinForceOneSwapFailure = `$true"
+    "$errorPreferenceNeedle`r`n`$script:DreamSkinForceOneMoveAccessDenial = `$true`r`n`$script:DreamSkinForceOneSwapFailure = `$true"
   ).Replace(
     $directoryMoveNeedle,
     @'
-  if ($script:DreamSkinForceOneSwapFailure -and
-    [System.IO.Path]::GetFileName($destinationFull) -ceq 'engine') {
-    $script:DreamSkinForceOneSwapFailure = $false
-    throw 'forced atomic patch swap failure'
-  }
-  [System.IO.Directory]::Move($sourceFull, $destinationFull)
+      if ($script:DreamSkinForceOneMoveAccessDenial -and
+        [System.IO.Path]::GetFileName($destinationFull) -like '.engine-patch-backup-*') {
+        $script:DreamSkinForceOneMoveAccessDenial = $false
+        throw [System.UnauthorizedAccessException]::new('forced transient atomic patch access denial')
+      }
+      if ($script:DreamSkinForceOneSwapFailure -and
+        [System.IO.Path]::GetFileName($destinationFull) -ceq 'engine') {
+        $script:DreamSkinForceOneSwapFailure = $false
+        throw 'forced atomic patch swap failure'
+      }
+      [System.IO.Directory]::Move($sourceFull, $destinationFull)
 '@
   )
   [System.IO.File]::WriteAllText(

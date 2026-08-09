@@ -37,9 +37,16 @@ function Assert-DreamSkinPatchSource {
   if (-not $commonText.Contains('Resolve-DreamSkinStartPort') -or
     -not $startText.Contains('Resolve-DreamSkinStartPort -Port $Port') -or
     -not $injectorText.Contains('__DREAM_SIDEBAR_SCROLL_QUIET_ENABLED_JSON__') -or
+    -not $injectorText.Contains('Array.isArray(result.scope?.missingL1)') -or
+    -not $injectorText.Contains('const firstVisible = (nodes)') -or
     -not $rendererText.Contains('composerOwnerSelector') -or
-    -not $rendererText.Contains("owner.closest?.('aside')") -or
+    -not $rendererText.Contains('owner.closest?.("aside")') -or
     -not $rendererText.Contains('findGenericComposers') -or
+    -not $rendererText.Contains('genericComposerRejectSelector') -or
+    -not $rendererText.Contains('const NATIVE_PRESET_MIN_COUNT = 2;') -or
+    -not $rendererText.Contains('const NAVIGATION_CONFIRM_DELAY_MS = 360;') -or
+    -not $rendererText.Contains('navigationConfirmTimer') -or
+    -not $rendererText.Contains('activeHomeSuggestionRoot') -or
     -not $rendererText.Contains('themeDiffsContainers') -or
     -not $rendererText.Contains('const fallbackProbe = () =>') -or
     -not $rendererText.Contains('[data-app-action-sidebar-thread-row]') -or
@@ -51,6 +58,7 @@ function Assert-DreamSkinPatchSource {
     -not $cssText.Contains('diffs-container') -or
     -not $cssText.Contains('[aria-modal="true"]') -or
     -not $cssText.Contains('_ComposerLayoutBody_') -or
+    -not $cssText.Contains('.dream-native-suggestions-root') -or
     -not $cssText.Contains('html.codex-dream-skin.dream-theme-light :where(') -or
     -not $acrylicCssText.Contains('[class*="_railList_"]') -or
     -not $acrylicCssText.Contains('.text-fade-truncate') -or
@@ -97,7 +105,25 @@ function Move-DreamSkinPatchDirectoryAtomically {
   # child-by-child moves when an executable below it is open. Directory.Move is
   # one same-volume Win32 rename: it either commits the whole tree or leaves the
   # source byte-for-byte intact.
-  [System.IO.Directory]::Move($sourceFull, $destinationFull)
+  $maximumAttempts = 6
+  for ($attempt = 1; $attempt -le $maximumAttempts; $attempt += 1) {
+    try {
+      [System.IO.Directory]::Move($sourceFull, $destinationFull)
+      return
+    } catch [System.UnauthorizedAccessException], [System.IO.IOException] {
+      # A just-stopped managed Node process or an antivirus scanner can retain
+      # a short-lived directory handle after process exit. Retry only while the
+      # atomic rename demonstrably did not commit and both endpoints retain the
+      # exact pre-move shape; every ambiguous state remains fail closed.
+      if ($attempt -ge $maximumAttempts -or
+        -not (Test-Path -LiteralPath $sourceFull -PathType Container) -or
+        (Test-Path -LiteralPath $destinationFull)) {
+        throw
+      }
+      $delayMilliseconds = [Math]::Min(1000, 75 * [Math]::Pow(2, $attempt - 1))
+      Start-Sleep -Milliseconds ([int]$delayMilliseconds)
+    }
+  }
 }
 
 function Get-DreamSkinPatchEngineNodeUsers {
