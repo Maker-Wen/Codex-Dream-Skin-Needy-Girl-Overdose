@@ -1218,7 +1218,9 @@ args = [
         $activeBeforeInvalidSaved) {
       throw "Invalid legacy saved theme changed saved or active state: $($invalidSaved.Label)"
     }
+    Remove-Item -LiteralPath $invalidSavedDirectory -Recurse -Force
   }
+  Remove-Item -LiteralPath $legacySavedDirectory -Recurse -Force
 
   foreach ($invalidLegacy in @(
     [pscustomobject]@{ Label = 'future schema'; Id = 'custom'; Schema = 2; IncludeSchema = $true },

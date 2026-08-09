@@ -63,6 +63,11 @@ Updated: 2026-08-09 CST (Asia/Shanghai)
   plugin, and restores both plugin and engine on caught failure. A macOS
   transaction fixture covers success from a v1.5.13-shaped engine and missing
   helper failure before live mutation; exact-head macOS CI will execute it.
+- [ci follow-up] Exact `b0644a2` Static and macOS jobs passed, including the new
+  menu transaction fixture. Both Windows hosts deterministically reached the
+  existing saved-theme count assertion and failed because the new migration
+  fixtures were left in the shared test store. The fixture directories are now
+  removed after their assertions; production behavior was not implicated.
 - [pending] Commit and push the review follow-up, require the new exact-head CI,
   reply to and resolve all five review threads, merge, then verify tag, public
   Release, DMG, Setup.exe and SHA256SUMS.txt.
