@@ -46,8 +46,16 @@ Updated: 2026-08-09 CST (Asia/Shanghai)
   modes remain executable, no upstream release/download URL replaced the fork,
   the macOS dimension helper is included in both full and standalone packaging,
   and the shared validator copies are byte-identical.
-- [pending] Commit/push/open a ready PR, require exact-head CI, merge, then
-  verify tag, public Release, DMG, Setup.exe and SHA256SUMS.txt.
+- [ci follow-up] Merge commit `450b9148` was pushed and PR #25 opened. Its first
+  Static checks run exposed one obsolete string assertion that still required a
+  single `querySelector` Home probe; the test now asserts the merged
+  `firstVisible(queryAll(...))` plus visible semantic-route fallback contract.
+  Node syntax passes and the Windows run advances past that assertion to the
+  test's pre-existing `/bin/bash`-only fixture; the exact Ubuntu rerun is
+  pending. Windows-only directory-fsync/symlink failures are not being converted
+  into skips or relaxed checks.
+- [pending] Push the minimal CI assertion follow-up, require the new exact-head
+  CI, merge, then verify tag, public Release, DMG, Setup.exe and SHA256SUMS.txt.
 
 ## v1.5.13 Issue #14/#16 completion and release
 
