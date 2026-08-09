@@ -4,6 +4,20 @@ param([Parameter(Mandatory = $true)][string]$Root)
 $ErrorActionPreference = 'Stop'
 $startPath = Join-Path $Root 'scripts\start-dream-skin.ps1'
 $source = [System.IO.File]::ReadAllText($startPath)
+$terminalExitPattern = '(?m)^exit 0[ \t]*\r?$'
+$terminalExitMatches = [regex]::Matches($source, $terminalExitPattern)
+if ($terminalExitMatches.Count -ne 1) {
+  throw "Start readiness fixture expected exactly one unindented success trailer, found $($terminalExitMatches.Count)."
+}
+$source = [regex]::Replace(
+  $source,
+  $terminalExitPattern,
+  '$$script:startupReturned = $$true'
+)
+if ([regex]::Matches($source, $terminalExitPattern).Count -ne 0 -or
+  [regex]::Matches($source, [regex]::Escape('$script:startupReturned = $true')).Count -ne 1) {
+  throw 'Start readiness fixture did not replace the production success trailer with exactly one test sentinel.'
+}
 $dotSourcePattern = '(?m)^\.\s+\(Join-Path \$PSScriptRoot ''(?:common-windows|theme-windows)\.ps1''\)\r?\n'
 if ([regex]::Matches($source, $dotSourcePattern).Count -ne 2) {
   throw 'Start readiness fixture could not isolate the two runtime imports.'
@@ -25,19 +39,27 @@ if ($source.Contains('$PSScriptRoot')) {
   throw 'Start readiness fixture left a real script-root dependency in the isolated source.'
 }
 
-$script:daemon = [pscustomobject]@{ Id = 4242; HasExited = $false }
-$script:daemon | Add-Member -MemberType ScriptMethod -Name WaitForExit -Value {
-  param([int]$Milliseconds)
-  return $this.HasExited
+function New-DreamSkinFixtureDaemon {
+  $daemon = [pscustomobject]@{ Id = 4242; HasExited = $false }
+  $daemon | Add-Member -MemberType ScriptMethod -Name WaitForExit -Value {
+    param([int]$Milliseconds)
+    return $this.HasExited
+  }
+  return $daemon
 }
+
+$script:daemon = New-DreamSkinFixtureDaemon
 $script:dateCall = 0
+$script:dateStepSeconds = 120
 $script:verifyCalls = 0
+$script:verifyExitCodes = @(2)
 $script:verifyAllowedHidden = $false
 $script:removeCalls = 0
 $script:stateWritten = $false
 $script:stateRemoved = $false
 $script:daemonStopped = $false
 $script:lockExited = $false
+$script:startupReturned = $false
 $script:hostMessages = @()
 
 function Enter-DreamSkinOperationLock {
@@ -131,7 +153,12 @@ function Invoke-DreamSkinNative {
   if ($ArgumentList -contains '--verify') {
     $script:verifyCalls += 1
     $script:verifyAllowedHidden = $ArgumentList -contains '--allow-hidden-document'
-    return [pscustomobject]@{ ExitCode = 2; Output = @('{"pass":false}') }
+    $verifyIndex = [Math]::Min($script:verifyCalls - 1, $script:verifyExitCodes.Count - 1)
+    $verifyExitCode = [int]$script:verifyExitCodes[$verifyIndex]
+    return [pscustomobject]@{
+      ExitCode = $verifyExitCode
+      Output = @($(if ($verifyExitCode -eq 0) { '{"pass":true}' } else { '{"pass":false}' }))
+    }
   }
   if ($ArgumentList -contains '--remove') {
     $script:removeCalls += 1
@@ -142,7 +169,9 @@ function Invoke-DreamSkinNative {
 function Write-DreamSkinUtf8FileAtomically { param([string]$Path, [string]$Content) }
 function Get-Date {
   $script:dateCall += 1
-  return [DateTime]::new(2026, 7, 25, 0, 0, 0, [DateTimeKind]::Utc).AddSeconds(120 * $script:dateCall)
+  return [DateTime]::new(2026, 7, 25, 0, 0, 0, [DateTimeKind]::Utc).AddSeconds(
+    $script:dateStepSeconds * $script:dateCall
+  )
 }
 function Start-Sleep { param([int]$Milliseconds, [int]$Seconds) }
 function Stop-Process {
@@ -186,7 +215,7 @@ if (-not $failed -or $script:verifyCalls -ne 1 -or -not $script:verifyAllowedHid
   $script:removeCalls -ne 1 -or
   -not $script:stateWritten -or -not $script:stateRemoved -or
   -not $script:daemonStopped -or -not $script:daemon.HasExited -or
-  -not $script:lockExited -or $announcedActive) {
+  -not $script:lockExited -or $script:startupReturned -or $announcedActive) {
   $detail = [ordered]@{
     failureMessage = $failureMessage
     failed = $failed
@@ -198,9 +227,63 @@ if (-not $failed -or $script:verifyCalls -ne 1 -or -not $script:verifyAllowedHid
     daemonStopped = $script:daemonStopped
     daemonHasExited = $script:daemon.HasExited
     lockExited = $script:lockExited
+    startupReturned = $script:startupReturned
     announcedActive = $announcedActive
   } | ConvertTo-Json -Compress
   throw "A failed renderer readiness check did not stop startup and run the existing rollback path: $detail"
 }
 
 Write-Output 'PASS: renderer readiness failure stops Windows startup and clears transient state.'
+
+$script:daemon = New-DreamSkinFixtureDaemon
+$script:dateCall = 0
+$script:dateStepSeconds = 15
+$script:verifyCalls = 0
+$script:verifyExitCodes = @(2, 2, 0)
+$script:verifyAllowedHidden = $false
+$script:removeCalls = 0
+$script:stateWritten = $false
+$script:stateRemoved = $false
+$script:daemonStopped = $false
+$script:lockExited = $false
+$script:startupReturned = $false
+$script:hostMessages = @()
+
+$successFailureMessage = $null
+$originalLocalAppData = $env:LOCALAPPDATA
+$env:LOCALAPPDATA = Join-Path ([System.IO.Path]::GetTempPath()) 'dreamskin-start-readiness-fixture'
+try {
+  try {
+    & $startBlock -Port 9335
+  } catch {
+    $successFailureMessage = $_.Exception.Message
+  }
+} finally {
+  $env:LOCALAPPDATA = $originalLocalAppData
+}
+
+$announcedActive = @($script:hostMessages | Where-Object {
+  $_ -like 'Codex Dream Skin is active*'
+}).Count -gt 0
+if ($null -ne $successFailureMessage -or $script:verifyCalls -ne 3 -or
+  -not $script:verifyAllowedHidden -or $script:removeCalls -ne 0 -or
+  -not $script:stateWritten -or $script:stateRemoved -or
+  $script:daemonStopped -or $script:daemon.HasExited -or
+  -not $script:lockExited -or -not $script:startupReturned -or -not $announcedActive) {
+  $detail = [ordered]@{
+    failureMessage = $successFailureMessage
+    verifyCalls = $script:verifyCalls
+    verifyAllowedHidden = $script:verifyAllowedHidden
+    removeCalls = $script:removeCalls
+    stateWritten = $script:stateWritten
+    stateRemoved = $script:stateRemoved
+    daemonStopped = $script:daemonStopped
+    daemonHasExited = $script:daemon.HasExited
+    lockExited = $script:lockExited
+    startupReturned = $script:startupReturned
+    announcedActive = $announcedActive
+  } | ConvertTo-Json -Compress
+  throw "Renderer readiness retries did not keep the watcher alive after the third verification succeeded: $detail"
+}
+
+Write-Output 'PASS: renderer readiness retries twice, succeeds on the third check, and keeps the watcher active.'

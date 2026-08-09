@@ -9,7 +9,7 @@
     "preset-internet-angel-default",
   ]);
   const isInternetAngelTheme = INTERNET_ANGEL_THEME_IDS.has(String(rawConfig?.id || "").trim());
-  const STYLE_REVISION = "10";
+  const STYLE_REVISION = "11";
   const SKIN_VERSION = __DREAM_SKIN_VERSION_JSON__;
   const PAYLOAD_REVISION = __DREAM_SKIN_PAYLOAD_REVISION_JSON__;
   const SHELL_MAIN_SELECTOR = 'main:is(.main-surface, [data-app-shell-main-surface], [class*="_MainContentSurface_"])';
@@ -23,6 +23,17 @@
   const COMPOSER_TOOLBAR_SELECTOR = ':is(.composer-surface-chrome [class*="_footer_"], [data-composer-surface-variant] [data-composer-footer-responsive])';
   const CHROME_ID = "codex-dream-skin-chrome";
   const FALLBACK_PRESETS_ID = "codex-dream-skin-presets";
+  const HOME_SUGGESTIONS_SELECTOR = [
+    ".group\\/home-suggestions",
+    '[data-feature="home-suggestions"]',
+    '[data-testid*="home-suggestion" i]',
+  ].join(", ");
+  const STABLE_HOME_SUGGESTIONS_SELECTOR = [
+    ".group\\/home-suggestions",
+    '[data-feature="home-suggestions"]',
+    '[data-testid="home-suggestions"]',
+  ].join(", ");
+  const NATIVE_SUGGESTIONS_ROOT_CLASS = "dream-native-suggestions-root";
   const SIDEBAR_CHROME_ID = "codex-dream-sidebar-ornaments";
   const SIDE_WORKSPACE_BRAND_ID = "codex-dream-side-workspace-brand";
   const NEW_TASK_CLASS = "dream-new-task-button";
@@ -163,13 +174,17 @@
   const installToken = {};
   const DOM_REFRESH_DEBOUNCE_MS = 1500;
   const INTERACTION_QUIET_MS = 320;
+  const NAVIGATION_CONFIRM_DELAY_MS = 360;
   const SIDEBAR_SCROLL_QUIET_MS = 96;
   const FALLBACK_REFRESH_MS = 60000;
   const ENSURE_ERROR_LOG_INTERVAL_MS = 30000;
+  const NATIVE_PRESET_MIN_COUNT = 2;
   let samplingNativeShell = false;
   let observer = null;
   let resizeObserver = null;
   let resizeTargets = new Set();
+  let activeHomeSurface = null;
+  let activeHomeSuggestionRoot = null;
   const resizeTargetSizes = new WeakMap();
   const geometryScheduler = { frame: null, settleTimer: null };
   window.__CODEX_DREAM_SKIN_DISABLED__ = false;
@@ -248,6 +263,7 @@
   if (previous?.timer) clearInterval(previous.timer);
   if (previous?.scheduler?.timeout) clearTimeout(previous.scheduler.timeout);
   if (previous?.scheduler?.navigationTimer) clearTimeout(previous.scheduler.navigationTimer);
+  if (previous?.scheduler?.navigationConfirmTimer) clearTimeout(previous.scheduler.navigationConfirmTimer);
   if (previous?.scheduler?.frame) window.cancelAnimationFrame?.(previous.scheduler.frame);
   if (previous?.geometryScheduler?.frame) {
     window.cancelAnimationFrame?.(previous.geometryScheduler.frame);
@@ -497,6 +513,9 @@
       node.classList.remove(SIDEBAR_ACTIVE_ITEM_CLASS);
     });
     document.querySelectorAll(`.${PRESET_CLASSES.join(", .")}`).forEach((node) => node.classList.remove(...PRESET_CLASSES));
+    document.querySelectorAll(`.${NATIVE_SUGGESTIONS_ROOT_CLASS}`).forEach((node) => {
+      node.classList.remove(NATIVE_SUGGESTIONS_ROOT_CLASS);
+    });
     document.querySelectorAll(".dream-changes-pill").forEach((node) => node.classList.remove("dream-changes-pill"));
     document.querySelectorAll(`.${CHANGES_SHELL_CLASS}`).forEach((node) => node.classList.remove(CHANGES_SHELL_CLASS));
     document.querySelectorAll(`.${CHANGES_CLIP_HOST_CLASS}`).forEach((node) => node.classList.remove(CHANGES_CLIP_HOST_CLASS));
@@ -532,6 +551,8 @@
     document.getElementById(FALLBACK_PRESETS_ID)?.remove();
     document.getElementById(SIDEBAR_CHROME_ID)?.remove();
     document.getElementById(SIDE_WORKSPACE_BRAND_ID)?.remove();
+    activeHomeSurface = null;
+    activeHomeSuggestionRoot = null;
   };
 
   const applyProfile = (root) => {
@@ -729,7 +750,7 @@
       deck.appendChild(grid);
       home.appendChild(deck);
     }
-    const ready = nativePresetCount < fallbackPresetDefinitions.length;
+    const ready = nativePresetCount < NATIVE_PRESET_MIN_COUNT;
     deck.setAttribute("data-dream-ready", String(ready));
     document.documentElement?.classList?.toggle?.("dream-presets-ready", ready);
     if (ready) deck.removeAttribute?.("hidden");
@@ -813,13 +834,120 @@
   const all = (selector) => {
     try { return [...document.querySelectorAll(selector)]; } catch { return []; }
   };
-  const genericInputs = () => all('textarea, [contenteditable], [role="textbox"], [data-placeholder]')
+  const allWithin = (root, selector) => {
+    if (!root) return [];
+    const matches = [];
+    try {
+      if (root.matches?.(selector)) matches.push(root);
+      for (const node of root.querySelectorAll?.(selector) || []) {
+        if (!matches.includes(node)) matches.push(node);
+      }
+    } catch {}
+    return matches;
+  };
+  const isRenderedElement = (node) => {
+    if (!node || node.isConnected === false) return false;
+    const box = node.getBoundingClientRect?.() || { x: 0, y: 0, width: 0, height: 0 };
+    if (!(box.width > 0 && box.height > 0)) return false;
+    let style = null;
+    try { style = getComputedStyle(node); } catch {}
+    const opacity = Number.parseFloat(style?.opacity);
+    if (style?.display === "none" || style?.visibility === "hidden" ||
+      style?.visibility === "collapse" || style?.contentVisibility === "hidden" ||
+      (Number.isFinite(opacity) && opacity <= .05)) return false;
+    try {
+      if (typeof node.checkVisibility === "function" && !node.checkVisibility({
+        checkOpacity: true,
+        checkVisibilityCSS: true,
+      })) return false;
+    } catch {}
+    const x = Number.isFinite(box.x) ? box.x : Number(box.left || 0);
+    const y = Number.isFinite(box.y) ? box.y : Number(box.top || 0);
+    const right = Number.isFinite(box.right) ? box.right : x + box.width;
+    const bottom = Number.isFinite(box.bottom) ? box.bottom : y + box.height;
+    const viewportWidth = Number(window.innerWidth || document.documentElement?.clientWidth || 0);
+    const viewportHeight = Number(window.innerHeight || document.documentElement?.clientHeight || 0);
+    return right > 0 && bottom > 0 && x < viewportWidth && y < viewportHeight;
+  };
+  const findHomeSuggestionRoot = (home) => {
+    if (!home) return null;
+    const unsafeRootSelector = [
+      COMPOSER_SELECTOR,
+      '[data-ds-part="composer"]',
+      '[class*="ComposerLayoutRoot" i]',
+      '[class*="terminal-panel" i]',
+      '[data-feature="game-source"]',
+      '[data-testid="home-icon"]',
+    ].join(", ");
+    const hasHomeHeading = (candidate) => allWithin(candidate, 'h1, h2, [role="heading"]')
+      .some((heading) => /^(我们该构建什么|what should we build)\s*[？?]?$/i
+        .test((heading.textContent || "").trim()));
+    const isSafeRoot = (candidate) => Boolean(
+      candidate && candidate !== home && !candidate.matches?.(unsafeRootSelector) &&
+      !candidate.querySelector?.(unsafeRootSelector) && !hasHomeHeading(candidate),
+    );
+    const stableRoots = allWithin(home, STABLE_HOME_SUGGESTIONS_SELECTOR)
+      .filter((node) => !node.closest?.(`#${FALLBACK_PRESETS_ID}`));
+    const stableRoot = stableRoots.find((node) => isRenderedElement(node) && isSafeRoot(node));
+    if (stableRoot) return stableRoot;
+    const signals = allWithin(home, HOME_SUGGESTIONS_SELECTOR)
+      .filter((node) => node !== home && !node.closest?.(`#${FALLBACK_PRESETS_ID}`))
+      .filter(isRenderedElement);
+    if (!signals.length) return null;
+    const containerSignal = signals.find((node) => {
+      const testId = String(node.getAttribute?.("data-testid") || "");
+      const semanticContainer = /^home-suggestions?(?:$|[-_](?:grid|list|cards|deck|container|root))$/i
+        .test(testId);
+      const descendantSignals = allWithin(node, HOME_SUGGESTIONS_SELECTOR)
+        .filter((candidate) => candidate !== node);
+      return isSafeRoot(node) && (semanticContainer || descendantSignals.length >= 2 ||
+        homeSuggestionButtons(node).length >= 2);
+    });
+    if (containerSignal) return containerSignal;
+    const firstSignal = signals[0];
+    let commonRoot = firstSignal.matches?.("button")
+      ? firstSignal.parentElement
+      : firstSignal.parentElement || firstSignal;
+    while (commonRoot && commonRoot !== home &&
+      !signals.every((node) => commonRoot.contains?.(node))) {
+      commonRoot = commonRoot.parentElement;
+    }
+    if (isSafeRoot(commonRoot)) return commonRoot;
+    const leafRoot = firstSignal.matches?.("button")
+      ? firstSignal.parentElement || firstSignal
+      : firstSignal;
+    return isSafeRoot(leafRoot) ? leafRoot : null;
+  };
+  const homeSuggestionButtons = (root) => {
+    if (!root) return [];
+    const buttons = [];
+    if (root.matches?.("button")) buttons.push(root);
+    for (const button of root.querySelectorAll?.("button") || []) {
+      if (!buttons.includes(button)) buttons.push(button);
+    }
+    return buttons;
+  };
+  const genericInputs = () => all(
+    'textarea, [contenteditable]:not([contenteditable="false"]), [role="textbox"], [data-placeholder]',
+  )
     .filter((node) => !node.closest?.('[role="dialog"], [aria-modal="true"]'))
     .filter((node) => node.closest?.('[class*="ComposerLayout" i]') ||
-      node.matches?.('textarea, [contenteditable], [role="textbox"]'));
+      node.matches?.('textarea, [contenteditable]:not([contenteditable="false"]), [role="textbox"]'))
+    .filter(isRenderedElement);
   const composerOwnerSelector =
     '[data-testid*="composer" i], [data-testid*="prompt" i], ' +
     '[class*="composer" i], [class*="prompt" i], [class*="terminal-panel" i]';
+  const genericComposerRootSelector =
+    '[class*="ComposerLayoutRoot" i], [class*="terminal-panel" i]';
+  const genericComposerRejectSelector = [
+    '[data-composer-footer-responsive]',
+    '[class*="ComposerLayoutFooter" i]',
+    '[class*="ComposerLayoutToolbar" i]',
+    '[class*="ComposerLayoutEditor" i]',
+    '[class*="composer-footer" i]',
+    '[class*="composer-toolbar" i]',
+    '[class*="composer-editor" i]',
+  ].join(", ");
   const resolvedMain = () => {
     const exact = all(SHELL_MAIN_SELECTOR)[0];
     if (exact) return exact;
@@ -831,24 +959,33 @@
       .find((node) => !node.closest?.('[role="dialog"], [aria-modal="true"]')) ?? null;
   };
   const findGenericComposers = () => {
-    if (all(COMPOSER_SELECTOR).length) return null;
     const main = resolvedMain();
     const owners = new Set();
-    for (const input of genericInputs()) {
+    const canonicalComposers = all(COMPOSER_SELECTOR);
+    const inputs = genericInputs().filter((input) =>
+      !canonicalComposers.some((composer) => composer.contains?.(input)));
+    const isValidOwner = (owner, input) => Boolean(
+      owner && input && owner !== input && owner.contains?.(input) && isRenderedElement(owner) &&
+      !owner.matches?.(genericComposerRejectSelector) &&
+      !owner.closest?.('[role="dialog"], [aria-modal="true"]') &&
+      (!main || main.contains?.(owner) || owner.closest?.("aside")),
+    );
+    for (const input of inputs) {
       if (main && !main.contains?.(input) &&
         !input.closest?.('aside, [class*="ComposerLayout" i]')) continue;
-      let owner = input.closest?.(composerOwnerSelector);
+      let owner = input.closest?.(genericComposerRootSelector) ||
+        input.closest?.(composerOwnerSelector);
       while (owner) {
         const next = owner.parentElement?.closest?.(composerOwnerSelector);
         if (!next || next === owner) break;
+        if (next.matches?.(genericComposerRejectSelector)) break;
         owner = next;
       }
-      if (owner && (!main || main.contains?.(owner) || owner.closest?.('aside'))) {
-        owners.add(owner);
-      }
+      if (isValidOwner(owner, input)) owners.add(owner);
     }
-    for (const node of all('[class*="ComposerLayoutRoot" i], [class*="terminal-panel" i]')) {
-      if (!node.closest?.('[role="dialog"], [aria-modal="true"]')) owners.add(node);
+    for (const node of all(genericComposerRootSelector)) {
+      const input = inputs.find((candidate) => node.contains?.(candidate));
+      if (isValidOwner(node, input)) owners.add(node);
     }
     return [...owners];
   };
@@ -893,7 +1030,7 @@
     add("root", [document.documentElement]);
     add("sidebar", [...all(SIDEBAR_SELECTOR), ...fallbackSidebar()]);
     add("header", all(HEADER_TINT_SELECTOR));
-    add("home", all('[role="main"]:has([data-testid="home-icon"])'));
+    add("home", all('[role="main"]:has([data-testid="home-icon"])').filter(isRenderedElement));
     add("main", [...all(SHELL_MAIN_SELECTOR), ...(!all(SHELL_MAIN_SELECTOR).length ? [resolvedMain()].filter(Boolean) : [])]);
     add("project-list", all(".group\\/project-selector"));
     add("thread", all(".thread-scroll-container"));
@@ -901,8 +1038,10 @@
     add("composer", [...all(COMPOSER_SELECTOR), ...fallbackComposer()]);
     add("composer-toolbar", all(COMPOSER_TOOLBAR_SELECTOR));
     add("dialog", all('[role="dialog"]'));
-    const homeHero = document.querySelector?.('[data-feature="game-source"]') ??
-      document.querySelector?.('[data-testid="home-icon"]')?.parentElement;
+    const homeHero = [
+      ...all('[data-feature="game-source"]'),
+      ...all('[data-testid="home-icon"]').map((node) => node.parentElement).filter(Boolean),
+    ].find(isRenderedElement);
     add("home-hero", homeHero ? [homeHero] : []);
 
     for (const node of safeCssPartNodes) {
@@ -918,7 +1057,7 @@
   const incrementalSafePartRules = [
     ["message", MESSAGE_SELECTOR],
     ["composer-toolbar", COMPOSER_TOOLBAR_SELECTOR],
-    ["composer", `${COMPOSER_SELECTOR}, [class*="ComposerLayoutRoot" i], [class*="terminal-panel" i]`],
+    ["composer", COMPOSER_SELECTOR],
     ["thread", ".thread-scroll-container"],
     ["dialog", '[role="dialog"]'],
     ["header", HEADER_TINT_SELECTOR],
@@ -1058,18 +1197,23 @@
     const settingsContent = settingsSidebar?.parentElement
       ?.querySelector?.(SETTINGS_CONTENT_SELECTOR)
       ?.parentElement || null;
-    const homeMarker = shellMain.querySelector?.('[data-testid="home-icon"]') ||
-      shellMain.querySelector?.('[data-feature="game-source"]') ||
-      shellMain.querySelector?.('.group\\/home-suggestions') || null;
-    const semanticHome = homeMarker?.closest?.('[role="main"]') ||
-      document.querySelector('[role="main"]:has([data-testid="home-icon"])');
+    const homeSignals = [
+      ...allWithin(shellMain, '[data-testid="home-icon"]'),
+      ...allWithin(shellMain, '[data-feature="game-source"]'),
+      ...allWithin(shellMain, HOME_SUGGESTIONS_SELECTOR),
+    ];
+    const homeMarker = [...new Set(homeSignals)].find(isRenderedElement) || null;
+    const semanticHome = homeMarker?.closest?.('[role="main"]') || null;
     const homeHeading = [...(shellMain.querySelectorAll?.('h1, h2, [role="heading"]') || [])]
-      .find((candidate) => /^(我们该构建什么|what should we build)\s*[？?]?$/i.test((candidate.textContent || "").trim()));
-    const home = semanticHome
-      || homeMarker?.closest?.('[role="main"]')
-      || (homeMarker ? shellMain : null)
-      || homeHeading?.closest?.('[role="main"]')
-      || (homeHeading ? shellMain : null);
+      .find((candidate) => isRenderedElement(candidate) &&
+        /^(我们该构建什么|what should we build)\s*[？?]?$/i.test((candidate.textContent || "").trim()));
+    const home = [
+      semanticHome,
+      homeMarker ? shellMain : null,
+      homeHeading?.closest?.('[role="main"]'),
+      homeHeading ? shellMain : null,
+    ].find((candidate) => candidate && isRenderedElement(candidate)) || null;
+    activeHomeSurface = home;
     if (resizeObserver) {
       const nextResizeTargets = new Set([shellMain, home].filter(Boolean));
       for (const target of resizeTargets) {
@@ -1600,22 +1744,20 @@
     ];
     /* Release our own fallback visibility before measuring the native deck.
        This happens inside one JS task, so native responsive hiding—not our
-       :has() rule—decides which deck is visible without a painted blank. */
+       managed class—decides which deck is visible without a painted blank. */
+    root.classList.remove("dream-presets-ready");
+    for (const candidate of document.querySelectorAll(`.${NATIVE_SUGGESTIONS_ROOT_CLASS}`)) {
+      candidate.classList.remove(NATIVE_SUGGESTIONS_ROOT_CLASS);
+    }
     const primedFallbackDeck = document.getElementById(FALLBACK_PRESETS_ID);
     if (primedFallbackDeck) {
       primedFallbackDeck.setAttribute("data-dream-ready", "false");
       primedFallbackDeck.setAttribute("hidden", "");
       primedFallbackDeck.setAttribute("aria-hidden", "true");
     }
-    const isPresetRendered = (button) => {
-      const box = button?.getBoundingClientRect?.() || { width: 0, height: 0 };
-      const style = button ? getComputedStyle(button) : null;
-      return box.width > 0
-        && box.height > 0
-        && style?.display !== "none"
-        && style?.visibility !== "hidden"
-        && Number(style?.opacity || 1) > .05;
-    };
+    const nativeSuggestionRoot = findHomeSuggestionRoot(home);
+    nativeSuggestionRoot?.classList.add(NATIVE_SUGGESTIONS_ROOT_CLASS);
+    activeHomeSuggestionRoot = nativeSuggestionRoot;
     const matchedNativePresets = new Set();
     for (const button of home?.querySelectorAll?.("button") || []) {
       if (button.closest?.(`#${FALLBACK_PRESETS_ID}`)) continue;
@@ -1623,16 +1765,14 @@
       const match = presetPatterns.find(([, pattern]) => pattern.test(text));
       if (!match) continue;
       button.classList.add("dream-codex-preset", match[0]);
-      if (isPresetRendered(button)) matchedNativePresets.add(button);
+      if (isRenderedElement(button)) matchedNativePresets.add(button);
     }
-    const structuralPresetButtons = [...(home?.querySelector?.(
-      '.group\\/home-suggestions, [data-testid*="home-suggestion"], [data-feature="home-suggestions"]',
-    )?.querySelectorAll?.("button") || [])]
+    const structuralPresetButtons = homeSuggestionButtons(nativeSuggestionRoot)
       .filter((button) => !button.closest?.(`#${FALLBACK_PRESETS_ID}`))
       .slice(0, fallbackPresetDefinitions.length);
     structuralPresetButtons.forEach((button, index) => {
       button.classList.add("dream-codex-preset", fallbackPresetDefinitions[index].className);
-      if (isPresetRendered(button)) matchedNativePresets.add(button);
+      if (isRenderedElement(button)) matchedNativePresets.add(button);
     });
     ensureFallbackPresets(home, matchedNativePresets.size);
     if (!home) {
@@ -1765,6 +1905,7 @@
     frame: null,
     timeout: null,
     navigationTimer: null,
+    navigationConfirmTimer: null,
     dueAt: 0,
     lastRunAt: -Infinity,
     running: false,
@@ -1808,6 +1949,28 @@
     if (root) observer.observe(root, attributeOptions);
     if (body) observer.observe(body, { ...attributeOptions, childList: true });
     if (shellMain) observer.observe(shellMain, { childList: true });
+    const suggestionRoot = activeHomeSuggestionRoot?.isConnected === false
+      ? null
+      : activeHomeSuggestionRoot;
+    if (suggestionRoot) {
+      observer.observe(suggestionRoot, { childList: true, subtree: true });
+      let parent = suggestionRoot.parentElement;
+      while (parent && parent !== activeHomeSurface && activeHomeSurface?.contains?.(parent)) {
+        observer.observe(parent, { childList: true });
+        parent = parent.parentElement;
+      }
+      if (activeHomeSurface && activeHomeSurface !== suggestionRoot) {
+        observer.observe(activeHomeSurface, { childList: true });
+      }
+    } else if (activeHomeSurface && activeHomeSurface.isConnected !== false && (
+      activeHomeSurface !== shellMain ||
+      root?.classList?.contains?.("dream-presets-ready")
+    )) {
+      /* While fallback cards are active and the native deck has not mounted,
+         watch the active Home subtree even when Home is the shell itself.
+         Once a stable deck exists, the observer narrows back to that root. */
+      observer.observe(activeHomeSurface, { childList: true, subtree: true });
+    }
   };
   const runEnsureSafely = () => {
     if (scheduler.running) {
@@ -1858,6 +2021,7 @@
     if (state?.timer) clearInterval(state.timer);
     if (state?.scheduler?.timeout) clearTimeout(state.scheduler.timeout);
     if (state?.scheduler?.navigationTimer) clearTimeout(state.scheduler.navigationTimer);
+    if (state?.scheduler?.navigationConfirmTimer) clearTimeout(state.scheduler.navigationConfirmTimer);
     if (state?.scheduler?.frame) window.cancelAnimationFrame?.(state.scheduler.frame);
     if (state?.geometryScheduler?.frame) {
       window.cancelAnimationFrame?.(state.geometryScheduler.frame);
@@ -2100,10 +2264,15 @@
   const motionHandler = () => scheduleEnsure(100);
   const scheduleNavigationRefresh = () => {
     if (scheduler.navigationTimer) clearTimeout(scheduler.navigationTimer);
+    if (scheduler.navigationConfirmTimer) clearTimeout(scheduler.navigationConfirmTimer);
     scheduler.navigationTimer = setTimeout(() => {
       scheduler.navigationTimer = null;
       scheduleEnsure(64);
     }, 48);
+    scheduler.navigationConfirmTimer = setTimeout(() => {
+      scheduler.navigationConfirmTimer = null;
+      scheduleEnsure();
+    }, NAVIGATION_CONFIRM_DELAY_MS);
   };
   const navigationHandler = (event) => {
     if (event?.type === "popstate") {
@@ -2129,7 +2298,7 @@
 
     const hadScheduledWork = Boolean(
       scheduler.running || scheduler.pending || scheduler.frame || scheduler.timeout ||
-      scheduler.navigationTimer,
+      scheduler.navigationTimer || scheduler.navigationConfirmTimer,
     );
     if (event?.type === "compositionstart") compositionDepth += 1;
     if (event?.type === "compositionend") compositionDepth = Math.max(0, compositionDepth - 1);
@@ -2164,7 +2333,7 @@
 
     const hadScheduledWork = Boolean(
       scheduler.running || scheduler.pending || scheduler.frame || scheduler.timeout ||
-      scheduler.navigationTimer,
+      scheduler.navigationTimer || scheduler.navigationConfirmTimer,
     );
     if (!hadScheduledWork) return;
     const scrollingSurface = surface || target?.closest?.(
@@ -2210,25 +2379,34 @@
       return withoutManagedClasses(record.oldValue) !==
         withoutManagedClasses(record.target?.getAttribute?.("class"));
     });
-    const hasKnownComposer = Boolean(document.querySelector(
-      `${COMPOSER_SELECTOR}, [data-ds-part="composer"]`,
-    ));
-    const hasGenericComposerNode = !hasKnownComposer && records.some((record) =>
+    const hasGenericComposerNode = records.some((record) =>
       [...(record.addedNodes || [])].some((node) =>
         node?.nodeType === 1 && (
           node.matches?.(
             'textarea, [contenteditable="true"], [role="textbox"], ' +
-            '[class*="ComposerLayoutRoot" i]',
+            '[class*="ComposerLayoutRoot" i], [class*="terminal-panel" i]',
           ) ||
           node.querySelector?.(
             'textarea, [contenteditable="true"], [role="textbox"], ' +
-            '[class*="ComposerLayoutRoot" i]',
+            '[class*="ComposerLayoutRoot" i], [class*="terminal-panel" i]',
           )
         )
       )
     );
-    if (hasShellChange || hasGenericComposerNode) {
-      scheduleEnsure(DOM_REFRESH_DEBOUNCE_MS);
+    const hasHomeSuggestionChange = records.some((record) => {
+      if (record.type !== "childList") return false;
+      if (activeHomeSuggestionRoot && (
+        record.target === activeHomeSuggestionRoot ||
+        activeHomeSuggestionRoot.contains?.(record.target)
+      )) return true;
+      return [...(record.addedNodes || []), ...(record.removedNodes || [])]
+        .some((node) => node?.nodeType === 1 && !isInjectedNode(node) && (
+          node.matches?.(`${HOME_SUGGESTIONS_SELECTOR}, .${NATIVE_SUGGESTIONS_ROOT_CLASS}`) ||
+          node.querySelector?.(`${HOME_SUGGESTIONS_SELECTOR}, .${NATIVE_SUGGESTIONS_ROOT_CLASS}`)
+        ));
+    });
+    if (hasShellChange || hasGenericComposerNode || hasHomeSuggestionChange) {
+      scheduleEnsure(hasHomeSuggestionChange ? 64 : DOM_REFRESH_DEBOUNCE_MS);
     }
   });
   observeRendererStructure();

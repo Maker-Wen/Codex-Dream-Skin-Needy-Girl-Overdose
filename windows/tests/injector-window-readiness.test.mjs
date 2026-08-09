@@ -85,8 +85,14 @@ function makeHome(options = {}) {
   const home = makeElement(options);
   const hero = makeElement(options.hero ?? {});
   home.firstElementChild = { firstElementChild: { firstElementChild: hero } };
-  const suggestions = options.suggestions ?? null;
-  home.querySelector = (selector) => selector === selectors.suggestions ? suggestions : null;
+  const rawSuggestions = options.suggestions ?? null;
+  const suggestions = rawSuggestions
+    ? Object.assign(makeElement({ rect: makeRect(760, 140, 90, 270) }), rawSuggestions)
+    : null;
+  const isSuggestionSelector = (selector) => selector === selectors.suggestions ||
+    selector.includes("home-suggestion") || selector.includes("dream-native-suggestions-root");
+  home.querySelector = (selector) => isSuggestionSelector(selector) ? suggestions : null;
+  home.querySelectorAll = (selector) => isSuggestionSelector(selector) && suggestions ? [suggestions] : [];
   return home;
 }
 
@@ -106,6 +112,15 @@ function makeDomFixture({
   viewportWidth = 1280,
   viewportHeight = 800,
 } = {}) {
+  let homeSignals = Array.isArray(homeSignal)
+    ? homeSignal.filter(Boolean)
+    : [homeSignal].filter(Boolean);
+  if (!homeSignals.length && home) {
+    homeSignals = [{
+      ...makeElement({ rect: makeRect(36, 36, 60, 60) }),
+      closest: (selector) => selector === '[role="main"]' ? home : null,
+    }];
+  }
   const styleNode = {};
   const documentElement = {
     scrollWidth: viewportWidth,
@@ -126,14 +141,31 @@ function makeDomFixture({
       if (selector === selectors.composer) return composer;
       if (selector === selectors.homeIcon) return null;
       if (selector === selectors.home) return home;
-      if (selector === selectors.gameSource || selector === selectors.suggestions) return homeSignal;
+      if (selector === selectors.gameSource || selector === selectors.suggestions) {
+        return homeSignals[0] ?? null;
+      }
       if (selector === '[data-ds-part="main"], [data-ds-part="home"]') return genericMain ?? home;
       if (selector === '[data-ds-part="composer"]') return genericInput;
       if (selector === selectors.settings || selector === selectors.legacySettings ||
         selector === selectors.themePreview) return settings;
       return null;
     },
-    querySelectorAll: () => [],
+    querySelectorAll(selector) {
+      if (selector === selectors.shell) return shell ? [shell] : [];
+      if (selector === selectors.sidebar) return sidebar ? [sidebar] : [];
+      if (selector === selectors.header) return header ? [header] : [];
+      if (selector === selectors.composer) return composer ? [composer] : [];
+      if (selector === selectors.home) return home ? [home] : [];
+      if (selector === '[data-ds-part="main"], [data-ds-part="home"]') {
+        return genericMain ? [genericMain] : [];
+      }
+      if (selector === '[data-ds-part="composer"]') return genericInput ? [genericInput] : [];
+      if (selector === selectors.homeIcon || selector === selectors.gameSource ||
+        selector === selectors.suggestions || selector.includes("home-suggestion")) {
+        return homeSignals;
+      }
+      return [];
+    },
     getElementById: (id) => id === "codex-dream-skin-style" ? styleNode : null,
   };
   const window = {
@@ -259,6 +291,7 @@ test("visible settings and home anchors are the only L0 structure exceptions", a
 
   const fallbackHome = makeHome({ rect: makeRect(900, 650, 20, 20) });
   const lateHomeIconSignal = {
+    ...makeElement({ rect: makeRect(36, 36, 80, 70) }),
     closest: (selector) => selector === '[role="main"]' ? fallbackHome : null,
   };
   const lateHomeIcon = await verify({
@@ -326,6 +359,85 @@ test("visible settings and home anchors are the only L0 structure exceptions", a
   assert.equal(falseHome.result.homePresent, false);
   assert.equal(falseHome.result.pass, false,
     "A renderer that claims Home must expose a real Home identity signal.");
+});
+
+test("home verification skips stale hidden signals and scans every current candidate", async () => {
+  const staleHome = makeHome({ rect: makeRect(900, 650, 20, 20) });
+  const currentHome = makeHome({ rect: makeRect(920, 660, 30, 25) });
+  const hiddenSignal = {
+    ...makeElement({
+      rect: makeRect(0, 0, -100, -100),
+      style: { display: "none" },
+      visible: false,
+    }),
+    closest: (selector) => selector === '[role="main"]' ? staleHome : null,
+  };
+  const visibleSignal = {
+    ...makeElement({ rect: makeRect(240, 84, 80, 260) }),
+    closest: (selector) => selector === '[role="main"]' ? currentHome : null,
+  };
+
+  const hiddenOnly = await verify({
+    dom: makeDomFixture({
+      scope: { level: "L1", baseState: "home", missingL1: [] },
+      home: null,
+      homeSignal: [hiddenSignal],
+    }),
+  });
+  assert.equal(hiddenOnly.result.homePresent, false,
+    "A stale hidden Home signal must not satisfy a runtime that claims the Home route.");
+  assert.equal(hiddenOnly.result.pass, false);
+
+  const laterVisible = await verify({
+    dom: makeDomFixture({
+      scope: { level: "L1", baseState: "home", missingL1: [] },
+      home: null,
+      homeSignal: [hiddenSignal, visibleSignal],
+    }),
+  });
+  assert.equal(laterVisible.result.homePresent, true,
+    "The verifier must scan past the first hidden broad match to a later visible Home signal.");
+  assert.deepEqual({ ...laterVisible.result.homeSurface }, {
+    x: 30,
+    y: 25,
+    width: 920,
+    height: 660,
+    visible: true,
+  });
+  assert.equal(laterVisible.result.pass, true);
+
+  const opacityBoundarySignal = {
+    ...makeElement({
+      rect: makeRect(240, 84, 80, 260),
+      style: { opacity: "0.05" },
+    }),
+    closest: (selector) => selector === '[role="main"]' ? currentHome : null,
+  };
+  const opacityAboveBoundarySignal = {
+    ...makeElement({
+      rect: makeRect(240, 84, 80, 260),
+      style: { opacity: "0.051" },
+    }),
+    closest: (selector) => selector === '[role="main"]' ? currentHome : null,
+  };
+  const boundaryHidden = await verify({
+    dom: makeDomFixture({
+      scope: { level: "L1", baseState: "home", missingL1: [] },
+      home: null,
+      homeSignal: [opacityBoundarySignal],
+    }),
+  });
+  assert.equal(boundaryHidden.result.homePresent, false,
+    "Opacity 0.05 must remain below the shared rendered-element threshold.");
+  const boundaryVisible = await verify({
+    dom: makeDomFixture({
+      scope: { level: "L1", baseState: "home", missingL1: [] },
+      home: null,
+      homeSignal: [opacityAboveBoundarySignal],
+    }),
+  });
+  assert.equal(boundaryVisible.result.homePresent, true,
+    "Opacity just above 0.05 must remain a visible Home identity signal.");
 });
 
 test("home verification matches macOS and does not require a fixed suggestion-card count", async () => {

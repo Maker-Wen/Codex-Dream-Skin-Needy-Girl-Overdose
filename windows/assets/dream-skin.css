@@ -1622,9 +1622,9 @@ html.codex-dream-skin .dream-home button.dream-codex-preset:hover {
     6px 6px 0 color-mix(in oklab, var(--angel-preset-color) 52%, var(--angel-ink)) !important;
 }
 
-/* Codex builds that omit the native Home suggestions receive a functional
-   fallback deck. It is mounted only while no native four-card set exists and
-   writes into the real ProseMirror composer instead of imitating submission. */
+/* Codex builds that expose fewer than the supported two-to-four responsive
+   native Home suggestions receive a functional fallback deck. It writes into
+   the real ProseMirror composer instead of imitating submission. */
 html.codex-dream-skin .dream-home #codex-dream-skin-presets {
   position: absolute;
   z-index: 8;
@@ -1635,8 +1635,8 @@ html.codex-dream-skin .dream-home #codex-dream-skin-presets {
   container: dream-presets / inline-size;
 }
 
-html.codex-dream-skin.dream-presets-ready .dream-home .group\/home-suggestions {
-  visibility: hidden !important;
+html.codex-dream-skin.dream-presets-ready .dream-native-suggestions-root {
+  display: none !important;
   pointer-events: none !important;
 }
 

@@ -183,31 +183,196 @@ if (-not (Get-Command Get-DreamSkinCodexAnyDebugIntentStatus -CommandType Functi
 }
 
 # The single per-user state slot is protected across terminal sessions by the
-# Global namespace. A second process for the same SID must fail closed while
-# the first operation owns the shared lock.
-$heldGlobalOperationLock = Enter-DreamSkinOperationLock -TimeoutMilliseconds 5000
-$lockProbe = $null
-try {
-  $escapedCommonPath = $commonPath.Replace("'", "''")
-  $probeSource =
-    ". '$escapedCommonPath'; try { " +
-    '$probe = Enter-DreamSkinOperationLock; Exit-DreamSkinOperationLock -Mutex $probe; exit 9' +
-    ' } catch { exit 0 }'
-  $encodedProbe = [Convert]::ToBase64String([Text.Encoding]::Unicode.GetBytes($probeSource))
-  $lockProbe = Start-Process -FilePath (Get-Command powershell.exe -ErrorAction Stop).Source `
-    -ArgumentList "-NoLogo -NoProfile -NonInteractive -EncodedCommand $encodedProbe" -WindowStyle Hidden -PassThru
-  if (-not $lockProbe.WaitForExit(30000)) {
-    Stop-Process -InputObject $lockProbe -Force -ErrorAction SilentlyContinue
-    if (-not $lockProbe.WaitForExit(5000)) {
-      throw 'The timed-out Global operation-lock contention probe could not be stopped.'
-    }
-    throw 'The Global operation-lock contention probe did not exit in time.'
+# Global namespace. Every host probes its own engine in an independent process;
+# PowerShell Core additionally probes Windows PowerShell when that host exists.
+# The cross-edition host is warmed before the parent takes the mutex, and a
+# ready-file handshake keeps host startup and lock contention on separate
+# budgets. The child embeds only the production lock functions so cold-loading
+# the rest of common-windows.ps1 cannot hide the actual mutex contract.
+$lockProbeStartupBudgetMilliseconds = 60000
+$lockProbeContentionBudgetMilliseconds = 15000
+$lockProbeCleanupBudgetMilliseconds = 5000
+
+function Stop-DreamSkinLockProbeProcess {
+  param(
+    [Parameter(Mandatory = $true)][System.Diagnostics.Process]$Process,
+    [Parameter(Mandatory = $true)][string]$Label
+  )
+  if ($Process.HasExited) { return }
+  Stop-Process -InputObject $Process -Force -ErrorAction Stop
+  if (-not $Process.WaitForExit($lockProbeCleanupBudgetMilliseconds)) {
+    throw "$Label could not be stopped within the bounded cleanup budget."
   }
-  if ($lockProbe.ExitCode -ne 0) {
-    throw 'The per-user operation lock did not serialize a second process in the Global namespace.'
+}
+
+function Invoke-DreamSkinLockProbeWarmup {
+  param(
+    [Parameter(Mandatory = $true)][string]$Executable,
+    [Parameter(Mandatory = $true)][string]$Label
+  )
+  $warmupSource = [Convert]::ToBase64String([Text.Encoding]::Unicode.GetBytes('exit 0'))
+  $warmup = $null
+  try {
+    $warmup = Start-Process -FilePath $Executable `
+      -ArgumentList "-NoLogo -NoProfile -NonInteractive -EncodedCommand $warmupSource" `
+      -WindowStyle Hidden -PassThru
+    if (-not $warmup.WaitForExit($lockProbeStartupBudgetMilliseconds)) {
+      Stop-DreamSkinLockProbeProcess -Process $warmup -Label "$Label startup warmup"
+      throw "$Label did not prewarm within the host-startup budget."
+    }
+    if ($warmup.ExitCode -ne 0) {
+      throw "$Label startup warmup failed with exit phase code $($warmup.ExitCode)."
+    }
+  } finally {
+    if ($null -ne $warmup) {
+      try {
+        Stop-DreamSkinLockProbeProcess -Process $warmup -Label "$Label startup warmup"
+      } finally {
+        $warmup.Dispose()
+      }
+    }
+  }
+}
+
+function Invoke-DreamSkinGlobalOperationLockProbe {
+  param(
+    [Parameter(Mandatory = $true)][string]$Executable,
+    [Parameter(Mandatory = $true)][string]$Label
+  )
+  $readyPath = Join-Path ([System.IO.Path]::GetTempPath()) `
+    ("dreamskin-operation-lock-ready-$([guid]::NewGuid().ToString('N')).txt")
+  $escapedReadyPath = $readyPath.Replace("'", "''")
+  $probeTemplate = @'
+function Enter-DreamSkinOperationLock {
+  param([ValidateRange(0, 300000)][int]$TimeoutMilliseconds = 0)
+  $sid = [System.Security.Principal.WindowsIdentity]::GetCurrent().User.Value
+  $mutex = [System.Threading.Mutex]::new($false, "Global\CodexDreamSkin.$sid.Operation")
+  $acquired = $false
+  try {
+    $acquired = $mutex.WaitOne($TimeoutMilliseconds)
+  } catch [System.Threading.AbandonedMutexException] {
+    $acquired = $true
+  }
+  if (-not $acquired) {
+    $mutex.Dispose()
+    if ($TimeoutMilliseconds -eq 0) {
+      throw 'Another Codex Dream Skin install, start, restore, or verify operation is already running.'
+    }
+    throw "Another Codex Dream Skin operation did not finish within $TimeoutMilliseconds ms."
+  }
+  return $mutex
+}
+
+function Exit-DreamSkinOperationLock {
+  param([Parameter(Mandatory = $true)][System.Threading.Mutex]$Mutex)
+  try { $Mutex.ReleaseMutex() } finally { $Mutex.Dispose() }
+}
+
+try {
+  [System.IO.File]::WriteAllText(
+    '__READY_PATH__',
+    'ready',
+    [System.Text.UTF8Encoding]::new($false)
+  )
+} catch {
+  exit 10
+}
+
+try {
+  $probe = Enter-DreamSkinOperationLock
+  Exit-DreamSkinOperationLock -Mutex $probe
+  exit 9
+} catch {
+  if ($_.Exception.Message -ceq 'Another Codex Dream Skin install, start, restore, or verify operation is already running.') {
+    exit 0
+  }
+  exit 8
+}
+'@
+  $probeSource = $probeTemplate.Replace('__READY_PATH__', $escapedReadyPath)
+  $encodedProbe = [Convert]::ToBase64String([Text.Encoding]::Unicode.GetBytes($probeSource))
+  $lockProbe = $null
+  try {
+    $lockProbe = Start-Process -FilePath $Executable `
+      -ArgumentList "-NoLogo -NoProfile -NonInteractive -EncodedCommand $encodedProbe" `
+      -WindowStyle Hidden -PassThru
+    $startupDeadline = [DateTime]::UtcNow.AddMilliseconds($lockProbeStartupBudgetMilliseconds)
+    $ready = $false
+    do {
+      if (Test-Path -LiteralPath $readyPath) {
+        $ready = $true
+        break
+      }
+      if ($lockProbe.HasExited) {
+        $ready = Test-Path -LiteralPath $readyPath
+        break
+      }
+      Start-Sleep -Milliseconds 50
+    } while ([DateTime]::UtcNow -lt $startupDeadline)
+
+    if (-not $ready) {
+      $startupExitCode = if ($lockProbe.HasExited) { "$($lockProbe.ExitCode)" } else { 'running' }
+      Stop-DreamSkinLockProbeProcess -Process $lockProbe -Label $Label
+      throw "$Label failed before the ready phase (exit phase code: $startupExitCode)."
+    }
+    if (-not $lockProbe.WaitForExit($lockProbeContentionBudgetMilliseconds)) {
+      Stop-DreamSkinLockProbeProcess -Process $lockProbe -Label $Label
+      throw "$Label reached the ready phase but did not reject contention within the contention budget."
+    }
+    if ($lockProbe.ExitCode -ne 0) {
+      $phase = switch ($lockProbe.ExitCode) {
+        8 { 'unexpected-exception'; break }
+        9 { 'lock-acquired'; break }
+        10 { 'ready-signal-failed'; break }
+        default { 'unknown'; break }
+      }
+      throw "$Label did not fail closed on the held Global mutex (exit phase code $($lockProbe.ExitCode): $phase)."
+    }
+  } finally {
+    try {
+      if ($null -ne $lockProbe) {
+        Stop-DreamSkinLockProbeProcess -Process $lockProbe -Label $Label
+      }
+    } finally {
+      if ($null -ne $lockProbe) { $lockProbe.Dispose() }
+      if ([System.IO.File]::Exists($readyPath)) { [System.IO.File]::Delete($readyPath) }
+    }
+  }
+}
+
+$sameEditionCommand = if ($PSVersionTable.PSEdition -ceq 'Core') { 'pwsh.exe' } else { 'powershell.exe' }
+$currentHostProcess = [System.Diagnostics.Process]::GetCurrentProcess()
+try {
+  $sameEditionExecutable = $currentHostProcess.MainModule.FileName
+} finally {
+  $currentHostProcess.Dispose()
+}
+$lockProbeHosts = @(
+  [pscustomobject]@{
+    Executable = $sameEditionExecutable
+    Label = "same-edition $sameEditionCommand operation-lock probe"
+  }
+)
+if ($PSVersionTable.PSEdition -ceq 'Core') {
+  $windowsPowerShellCommands = @(Get-Command powershell.exe -CommandType Application `
+    -ErrorAction SilentlyContinue)
+  if ($windowsPowerShellCommands.Count -gt 0) {
+    $windowsPowerShellCommand = $windowsPowerShellCommands[0]
+    Invoke-DreamSkinLockProbeWarmup -Executable $windowsPowerShellCommand.Source `
+      -Label 'cross-edition Windows PowerShell operation-lock probe'
+    $lockProbeHosts += [pscustomobject]@{
+      Executable = $windowsPowerShellCommand.Source
+      Label = 'cross-edition Windows PowerShell operation-lock probe'
+    }
+  }
+}
+
+$heldGlobalOperationLock = Enter-DreamSkinOperationLock -TimeoutMilliseconds 5000
+try {
+  foreach ($probeHost in $lockProbeHosts) {
+    Invoke-DreamSkinGlobalOperationLockProbe -Executable $probeHost.Executable -Label $probeHost.Label
   }
 } finally {
-  if ($null -ne $lockProbe) { $lockProbe.Dispose() }
   Exit-DreamSkinOperationLock -Mutex $heldGlobalOperationLock
 }
 
