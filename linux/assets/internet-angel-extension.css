@@ -10,6 +10,12 @@ html[data-dream-skin="active"][data-dream-theme="internet-angel"] {
   --angel-line: rgb(99 244 255 / .58);
   --angel-line-soft: rgb(99 244 255 / .24);
   --angel-shadow: rgb(23 19 45 / .72);
+  --angel-adaptive-text: var(--dream-text, var(--ds-text));
+  --angel-adaptive-muted: var(--dream-text-muted, var(--ds-muted));
+  --angel-adaptive-surface: var(--dream-surface, var(--ds-panel));
+  --angel-adaptive-surface-raised: var(--dream-surface-raised, var(--ds-panel-2));
+  --angel-adaptive-line-soft: var(--dream-line-soft, var(--ds-line));
+  --angel-adaptive-accent: var(--dream-accent, var(--ds-green));
   --angel-font-ui: -apple-system, BlinkMacSystemFont, "PingFang SC", "Segoe UI", sans-serif;
   --angel-font-mono: ui-monospace, SFMono-Regular, Menlo, Monaco, monospace;
   scrollbar-color: color-mix(in srgb, var(--angel-pink) 70%, var(--angel-blue)) transparent;
@@ -420,6 +426,12 @@ html[data-dream-skin="active"][data-dream-theme="internet-angel"] :is(
 
 /* Auxiliary browser, terminal, collaboration and side-chat workspaces. */
 html:root[data-dream-skin="active"][data-dream-theme="internet-angel"] [data-angel-component="side-workspace"] {
+  --angel-adaptive-text: var(--angel-paper);
+  --angel-adaptive-muted: color-mix(in srgb, var(--angel-paper) 72%, var(--angel-violet));
+  --angel-adaptive-surface: var(--angel-ink);
+  --angel-adaptive-surface-raised: var(--angel-surface-raised);
+  --angel-adaptive-line-soft: var(--angel-line-soft);
+  --angel-adaptive-accent: var(--angel-cyan);
   isolation: isolate;
   color: var(--angel-paper) !important;
   border-left: 2px solid var(--angel-blue) !important;
@@ -653,6 +665,20 @@ html[data-dream-skin="active"][data-dream-theme="internet-angel"] [data-angel-co
   box-shadow: inset 3px 0 var(--angel-pink), 0 4px 12px rgb(10 7 40 / .28) !important;
 }
 
+html[data-dream-skin="active"][data-dream-theme="internet-angel"]
+  [data-angel-component="settings-search"] input {
+  color: var(--angel-paper) !important;
+  border: 0 !important;
+  background: transparent !important;
+  box-shadow: none !important;
+}
+
+html[data-dream-skin="active"][data-dream-theme="internet-angel"] [data-angel-component="settings-search"]::placeholder,
+html[data-dream-skin="active"][data-dream-theme="internet-angel"]
+  [data-angel-component="settings-search"] input::placeholder {
+  color: color-mix(in srgb, var(--angel-paper) 72%, var(--angel-violet)) !important;
+}
+
 html[data-dream-skin="active"][data-dream-theme="internet-angel"] [data-angel-component="settings-content"] {
   position: relative;
   color: var(--angel-paper) !important;
@@ -709,6 +735,11 @@ html[data-dream-skin="active"][data-dream-theme="internet-angel"] :is(
   border-radius: 6px !important;
   background: linear-gradient(100deg, rgb(32 84 255 / .16), rgb(130 88 255 / .18)) !important;
   box-shadow: inset 0 -2px rgb(255 69 200 / .20) !important;
+}
+
+html[data-dream-skin="active"][data-dream-theme="internet-angel"]
+  [data-angel-component="settings-input"]::placeholder {
+  color: color-mix(in srgb, var(--angel-paper) 72%, var(--angel-violet)) !important;
 }
 
 html[data-dream-skin="active"][data-dream-theme="internet-angel"] :is(
@@ -1316,6 +1347,8 @@ html[data-dream-skin="active"][data-dream-theme="internet-angel"] [data-sonner-t
 
 /* Renderer-owned overlays and settings controls retain native focus ownership. */
 html[data-dream-skin="active"][data-dream-theme="internet-angel"] [role="dialog"],
+html[data-dream-skin="active"][data-dream-theme="internet-angel"] [aria-modal="true"],
+html[data-dream-skin="active"][data-dream-theme="internet-angel"] [data-radix-dialog-content],
 html[data-dream-skin="active"][data-dream-theme="internet-angel"] [role="menu"],
 html[data-dream-skin="active"][data-dream-theme="internet-angel"] [role="listbox"] {
   color: var(--angel-paper) !important;
@@ -1328,6 +1361,38 @@ html[data-dream-skin="active"][data-dream-theme="internet-angel"] [role="listbox
     5px 5px 0 color-mix(in srgb, var(--angel-pink) 58%, var(--angel-ink)),
     0 20px 52px rgb(10 7 40 / .42) !important;
   backdrop-filter: blur(18px) saturate(1.16) !important;
+}
+
+html[data-dream-skin="active"][data-dream-theme="internet-angel"] [role="menu"]::before,
+html[data-dream-skin="active"][data-dream-theme="internet-angel"] [role="listbox"]::before {
+  content: "";
+  position: absolute;
+  inset: 0 auto auto 0;
+  width: 54px;
+  height: 3px;
+  pointer-events: none;
+  background: linear-gradient(90deg, var(--angel-cyan) 0 34%, var(--angel-blue) 34% 68%, var(--angel-pink) 68%);
+}
+
+html[data-dream-skin="active"][data-dream-theme="internet-angel"] [role="menu"] [role="separator"] {
+  height: 1px !important;
+  margin: 6px 8px !important;
+  background: linear-gradient(90deg,
+    color-mix(in oklab, var(--angel-cyan) 48%, transparent),
+    color-mix(in oklab, var(--angel-pink) 38%, transparent)) !important;
+}
+
+html[data-dream-skin="active"][data-dream-theme="internet-angel"] [role="menu"] kbd,
+html[data-dream-skin="active"][data-dream-theme="internet-angel"] [role="menuitem"] [class*="shortcut"] {
+  color: var(--angel-adaptive-muted) !important;
+  font-family: var(--angel-font-mono) !important;
+  font-size: .9em;
+}
+
+html[data-dream-skin="active"][data-dream-theme="internet-angel"] :is(
+  [aria-modal="true"], [data-radix-dialog-content]
+) [class*="bg-token-main-surface-primary"] {
+  background: color-mix(in srgb, var(--angel-surface) 72%, transparent) !important;
 }
 
 html[data-dream-skin="active"][data-dream-theme="internet-angel"] :is(
@@ -1428,129 +1493,239 @@ html[data-dream-skin="active"][data-dream-theme="internet-angel"] ::-webkit-scro
   }
 }
 
-/* Light mode: the Angel paper token is fixed light, so every text-bearing
-   component must follow the adaptive Dream text color. Code, terminal and
-   dark badge surfaces keep their light glyph color. */
-html[data-dream-skin="active"][data-dream-theme="internet-angel"].dream-theme-light {
-  --angel-paper: var(--dream-text) !important;
+/* Codex 26.730 surfaces shared by the macOS and Windows renderers. */
+html[data-dream-skin="active"][data-dream-theme="internet-angel"]
+  [data-angel-component="side-workspace"] :is(
+    [class*="bg-token-main-surface-primary"],
+    [class*="file-diff"]
+  ) {
+  color: var(--angel-adaptive-text) !important;
+  border-color: var(--angel-adaptive-line-soft) !important;
+  background: color-mix(in oklab, var(--angel-adaptive-surface) 55%, transparent) !important;
 }
 
-html[data-dream-skin="active"][data-dream-theme="internet-angel"].dream-theme-light
+html[data-dream-skin="active"][data-dream-theme="internet-angel"]
+  [data-angel-component="side-workspace"] [class*="file-diff"] > div {
+  background: transparent !important;
+}
+
+html[data-dream-skin="active"][data-dream-theme="internet-angel"]
+  [data-angel-component="side-workspace"] [class*="file-diff"] [class*="codeBlock"] {
+  background: color-mix(in oklab, var(--angel-adaptive-surface) 72%, var(--angel-ink)) !important;
+}
+
+html[data-dream-skin="active"][data-dream-theme="internet-angel"]
+  [data-angel-component="composer"] :is(
+    [class*="_ComposerLayoutFooter_"],
+    [class*="_RichTextInput_"],
+    [class*="_ComposerLayoutBody_"],
+    [class*="_ComposerLayoutAttachments_"]
+  ) {
+  background: transparent !important;
+  border: 0 !important;
+  border-radius: 0 !important;
+  box-shadow: none !important;
+  backdrop-filter: none !important;
+}
+
+html[data-dream-skin="active"][data-dream-theme="internet-angel"] :is(
+  [class~="scroll-mt-4"][data-message-author-role],
+  [class~="scroll-mt-4"][data-local-conversation-user-anchor],
+  [class~="scroll-mt-4"][data-local-conversation-final-assistant]
+) {
+  background: transparent !important;
+  border: 0 !important;
+  border-radius: 0 !important;
+  box-shadow: none !important;
+}
+
+html[data-dream-skin="active"][data-dream-theme="internet-angel"]
+  main:is(.main-surface, [data-app-shell-main-surface], [class*="_MainContentSurface_"])
+  [class*="_MainContentFrame_"] [class~="bg-token-main-surface-primary"] {
+  color: var(--angel-adaptive-text) !important;
+  background:
+    linear-gradient(135deg,
+      color-mix(in oklab, var(--angel-adaptive-surface) 74%, transparent),
+      color-mix(in oklab, var(--angel-adaptive-surface) 64%, var(--angel-adaptive-accent) 7%)) !important;
+  border-color: color-mix(in oklab, var(--angel-adaptive-line-soft) 88%, var(--angel-adaptive-accent) 12%) !important;
+  backdrop-filter: blur(14px) saturate(1.08) !important;
+}
+
+html[data-dream-skin="active"][data-dream-theme="internet-angel"]
+  main:is(.main-surface, [data-app-shell-main-surface], [class*="_MainContentSurface_"])
+  [class*="_MainContentFrame_"] [class~="sticky"][class~="z-30"] {
+  background:
+    linear-gradient(90deg,
+      color-mix(in oklab, var(--angel-adaptive-surface-raised) 88%, var(--angel-blue) 8%),
+      color-mix(in oklab, var(--angel-adaptive-surface-raised) 84%, var(--angel-pink) 10%)) !important;
+  border-bottom: 1px solid var(--angel-adaptive-line-soft) !important;
+  backdrop-filter: blur(12px) saturate(1.05) !important;
+}
+
+html[data-dream-skin="active"][data-dream-theme="internet-angel"]
+  main:is(.main-surface, [data-app-shell-main-surface], [class*="_MainContentSurface_"])
+  [class*="_MainContentFrame_"] [class~="sticky"][class~="z-30"]::after {
+  background-image: linear-gradient(to bottom, transparent,
+    color-mix(in oklab, var(--angel-adaptive-surface) 10%, transparent)) !important;
+}
+
+html[data-dream-skin="active"][data-dream-theme="internet-angel"]
+  main:is(.main-surface, [data-app-shell-main-surface], [class*="_MainContentSurface_"])
+  [class*="_MainContentFrame_"] [class*="bg-token-input-background"] {
+  color: var(--angel-adaptive-text) !important;
+  background: color-mix(in oklab, var(--angel-adaptive-surface-raised) 84%, transparent) !important;
+  border: 1px solid var(--angel-adaptive-line-soft) !important;
+  box-shadow: 0 12px 30px color-mix(in oklab, var(--angel-adaptive-accent) 10%, transparent) !important;
+  backdrop-filter: blur(12px) saturate(1.05) !important;
+}
+
+html[data-dream-skin="active"][data-dream-theme="internet-angel"]
+  [class*="_MainContentFrame_"] [class*="bg-token-input-background"] input {
+  color: var(--angel-adaptive-text) !important;
+  background: transparent !important;
+}
+
+html[data-dream-skin="active"][data-dream-theme="internet-angel"]
+  [class*="_MainContentFrame_"] [class*="bg-token-input-background"] input::placeholder {
+  color: var(--angel-adaptive-muted) !important;
+}
+
+html[data-dream-skin="active"][data-dream-theme="internet-angel"] diffs-container {
+  --angel-adaptive-text: var(--dream-text, var(--ds-text));
+  --angel-adaptive-surface: var(--dream-surface, var(--ds-panel));
+  --angel-adaptive-surface-raised: var(--dream-surface-raised, var(--ds-panel-2));
+  --angel-adaptive-accent: var(--dream-accent, var(--ds-green));
+  --diffs-bg: color-mix(in oklab, var(--angel-adaptive-surface) 94%, var(--angel-adaptive-accent) 5%) !important;
+  --diffs-fg: var(--angel-adaptive-text) !important;
+  --diffs-bg-context: color-mix(in oklab, var(--angel-adaptive-surface-raised) 94%, var(--angel-adaptive-accent) 6%) !important;
+  color: var(--angel-adaptive-text) !important;
+  background-color: color-mix(in oklab, var(--angel-adaptive-surface) 94%, var(--angel-adaptive-accent) 5%) !important;
+}
+
+/* Light mode uses adaptive text on light surfaces. Fixed broadcast, code and
+   terminal surfaces retain the Angel paper foreground. */
+html[data-dream-skin="active"][data-dream-theme="internet-angel"]:is(.dream-theme-light, [data-dream-shell="light"])
   [data-angel-component] {
-  color: var(--dream-text) !important;
+  color: var(--angel-adaptive-text) !important;
 }
 
-html[data-dream-skin="active"][data-dream-theme="internet-angel"].dream-theme-light
+html[data-dream-skin="active"][data-dream-theme="internet-angel"]:is(.dream-theme-light, [data-dream-shell="light"])
   [data-angel-component] :where(button, a, p, span, div, li, h1, h2, h3, h4, h5, h6, label, td, th) {
-  color: var(--dream-text) !important;
+  color: var(--angel-adaptive-text) !important;
 }
 
-html[data-dream-skin="active"][data-dream-theme="internet-angel"].dream-theme-light
+html[data-dream-skin="active"][data-dream-theme="internet-angel"]:is(.dream-theme-light, [data-dream-shell="light"])
+  [data-angel-component="activity-header"] {
+  --color-token-conversation-body: var(--angel-adaptive-text);
+}
+
+html[data-dream-skin="active"][data-dream-theme="internet-angel"]:is(.dream-theme-light, [data-dream-shell="light"])
+  input:not([type="checkbox"]):not([type="radio"]):not([type="range"]):not([type="color"]):not([data-angel-component="settings-input"]):not([data-angel-component="settings-search"]):not([data-angel-component="settings-search"] input) {
+  color: var(--angel-adaptive-text) !important;
+  background: color-mix(in oklab, var(--angel-adaptive-surface-raised) 88%, transparent) !important;
+}
+
+html[data-dream-skin="active"][data-dream-theme="internet-angel"]:is(.dream-theme-light, [data-dream-shell="light"])
+  input:not([data-angel-component="settings-input"]):not([data-angel-component="settings-search"]):not([data-angel-component="settings-search"] input)::placeholder {
+  color: var(--angel-adaptive-muted) !important;
+}
+
+html[data-dream-skin="active"][data-dream-theme="internet-angel"]:is(.dream-theme-light, [data-dream-shell="light"])
   [data-angel-component="sidebar"] {
   background: linear-gradient(180deg,
-    color-mix(in oklab, var(--dream-surface) 88%, transparent),
-    color-mix(in oklab, var(--dream-surface) 82%, var(--angel-violet) 5%)) !important;
+    color-mix(in oklab, var(--angel-adaptive-surface) 88%, transparent),
+    color-mix(in oklab, var(--angel-adaptive-surface) 82%, var(--angel-violet) 5%)) !important;
 }
 
-html[data-dream-skin="active"][data-dream-theme="internet-angel"].dream-theme-light
+html[data-dream-skin="active"][data-dream-theme="internet-angel"]:is(.dream-theme-light, [data-dream-shell="light"])
   [data-angel-component="sidebar-row"]:hover,
-html[data-dream-skin="active"][data-dream-theme="internet-angel"].dream-theme-light
+html[data-dream-skin="active"][data-dream-theme="internet-angel"]:is(.dream-theme-light, [data-dream-shell="light"])
   [data-angel-component="sidebar-row"][data-state="active"],
-html[data-dream-skin="active"][data-dream-theme="internet-angel"].dream-theme-light
+html[data-dream-skin="active"][data-dream-theme="internet-angel"]:is(.dream-theme-light, [data-dream-shell="light"])
   [data-angel-component="sidebar-row"][aria-current="page"] {
-  background: color-mix(in oklab, var(--dream-surface-raised) 88%, var(--angel-cyan) 8%) !important;
+  background: color-mix(in oklab, var(--angel-adaptive-surface-raised) 88%, var(--angel-cyan) 8%) !important;
 }
 
-html[data-dream-skin="active"][data-dream-theme="internet-angel"].dream-theme-light
+html[data-dream-skin="active"][data-dream-theme="internet-angel"]:is(.dream-theme-light, [data-dream-shell="light"])
   [data-angel-component="sidebar-control"] svg,
-html[data-dream-skin="active"][data-dream-theme="internet-angel"].dream-theme-light
+html[data-dream-skin="active"][data-dream-theme="internet-angel"]:is(.dream-theme-light, [data-dream-shell="light"])
   [data-angel-component="sidebar-row"] svg {
-  color: var(--dream-text) !important;
+  color: var(--angel-adaptive-text) !important;
 }
 
-html[data-dream-skin="active"][data-dream-theme="internet-angel"].dream-theme-light
-  [data-angel-component] :is(pre, code, [class*="codeBlock"], [class*="font-vscode-editor"]) {
+html[data-dream-skin="active"][data-dream-theme="internet-angel"]:is(.dream-theme-light, [data-dream-shell="light"])
+  [data-angel-component] :is(pre, [class*="codeBlock"], [class*="font-vscode-editor"]) {
   color: var(--angel-paper) !important;
 }
 
-html[data-dream-skin="active"][data-dream-theme="internet-angel"].dream-theme-light
-  [data-angel-component] :is(pre, code, [class*="codeBlock"]) :where(span, div) {
+html[data-dream-skin="active"][data-dream-theme="internet-angel"]:is(.dream-theme-light, [data-dream-shell="light"])
+  [data-angel-component] :is(pre, [class*="codeBlock"]) :where(span, div) {
   color: var(--angel-paper) !important;
 }
 
-html[data-dream-skin="active"][data-dream-theme="internet-angel"].dream-theme-light
+html[data-dream-skin="active"][data-dream-theme="internet-angel"]:is(.dream-theme-light, [data-dream-shell="light"])
   [data-angel-component] :is(.xterm, .xterm-viewport, .xterm-screen, .xterm-rows) :where(div, span) {
   color: var(--angel-paper) !important;
 }
 
-html[data-dream-skin="active"][data-dream-theme="internet-angel"].dream-theme-light
-  [data-angel-component="edited-card-stats"],
-html[data-dream-skin="active"][data-dream-theme="internet-angel"].dream-theme-light
+html[data-dream-skin="active"][data-dream-theme="internet-angel"]:is(.dream-theme-light, [data-dream-shell="light"])
   [data-angel-component="activity-output"] {
   color: var(--angel-paper) !important;
 }
 
-html[data-dream-skin="active"][data-dream-theme="internet-angel"].dream-theme-light :is(
+html[data-dream-skin="active"][data-dream-theme="internet-angel"]:is(.dream-theme-light, [data-dream-shell="light"]) :is(
   [data-message-author-role="user"],
   [data-user-message-bubble="true"],
   [data-angel-component="message-user"]
 ) {
-  color: var(--dream-text) !important;
-  border: 1px solid color-mix(in oklab, var(--angel-pink) 48%, var(--dream-line-soft)) !important;
+  color: var(--angel-adaptive-text) !important;
+  border: 1px solid color-mix(in oklab, var(--angel-pink) 48%, var(--angel-adaptive-line-soft)) !important;
   border-left: 4px solid var(--angel-pink) !important;
   border-radius: 6px !important;
   background: linear-gradient(110deg,
-    color-mix(in oklab, var(--dream-surface-raised) 94%, var(--angel-pink) 8%),
-    color-mix(in oklab, var(--dream-surface-raised) 90%, var(--angel-violet) 9%)) !important;
+    color-mix(in oklab, var(--angel-adaptive-surface-raised) 94%, var(--angel-pink) 8%),
+    color-mix(in oklab, var(--angel-adaptive-surface-raised) 90%, var(--angel-violet) 9%)) !important;
   box-shadow: 2px 2px 0 color-mix(in oklab, var(--angel-violet) 28%, transparent) !important;
   text-shadow: none !important;
 }
 
-html[data-dream-skin="active"][data-dream-theme="internet-angel"].dream-theme-light
-  [data-angel-component="message-assistant"] :is(table, blockquote, details, [class*="codeBlock"]) {
+html[data-dream-skin="active"][data-dream-theme="internet-angel"]:is(.dream-theme-light, [data-dream-shell="light"])
+  [data-angel-component="message-assistant"] :is(table, details, [class*="codeBlock"]) {
   color: var(--angel-paper) !important;
 }
 
-html[data-dream-skin="active"][data-dream-theme="internet-angel"].dream-theme-light
-  [data-angel-component="message-assistant"] :is(td, blockquote, details, summary) :where(span, div, p, li) {
+html[data-dream-skin="active"][data-dream-theme="internet-angel"]:is(.dream-theme-light, [data-dream-shell="light"])
+  [data-angel-component="message-assistant"] :is(td, details, summary) :where(span, div, p, li) {
   color: var(--angel-paper) !important;
 }
 
-html[data-dream-skin="active"][data-dream-theme="internet-angel"].dream-theme-light
-  [data-angel-component="edited-card"] :where(button, span, div),
-html[data-dream-skin="active"][data-dream-theme="internet-angel"].dream-theme-light
-  [data-angel-component="edited-card-files"] :where(button, span, div) {
-  color: var(--dream-text) !important;
+html[data-dream-skin="active"][data-dream-theme="internet-angel"]:is(.dream-theme-light, [data-dream-shell="light"])
+  [data-angel-component="message-assistant"] :is(code:not(pre code), kbd) {
+  color: var(--angel-adaptive-text) !important;
 }
 
-html[data-dream-skin="active"][data-dream-theme="internet-angel"].dream-theme-light
-  [data-angel-component="edited-card-stats"] {
-  color: var(--dream-text) !important;
-  background: color-mix(in oklab, var(--dream-surface-raised) 88%, var(--angel-pink) 10%) !important;
-}
-
-html[data-dream-skin="active"][data-dream-theme="internet-angel"].dream-theme-light
+html[data-dream-skin="active"][data-dream-theme="internet-angel"]:is(.dream-theme-light, [data-dream-shell="light"])
   [data-angel-component="environment"] {
-  color: var(--dream-text) !important;
-  background: color-mix(in oklab, var(--dream-surface-raised) 92%, transparent) !important;
-  border: 1px solid color-mix(in oklab, var(--dream-line-soft) 90%, var(--dream-accent) 10%) !important;
+  color: var(--angel-adaptive-text) !important;
+  background: color-mix(in oklab, var(--angel-adaptive-surface-raised) 92%, transparent) !important;
+  border: 1px solid color-mix(in oklab, var(--angel-adaptive-line-soft) 90%, var(--angel-adaptive-accent) 10%) !important;
 }
 
-html[data-dream-skin="active"][data-dream-theme="internet-angel"].dream-theme-light
+html[data-dream-skin="active"][data-dream-theme="internet-angel"]:is(.dream-theme-light, [data-dream-shell="light"])
   [data-angel-component="scroll-bottom"]:is(:hover, :focus-visible) {
-  color: var(--dream-text) !important;
+  color: var(--angel-adaptive-text) !important;
   border-color: var(--angel-pink) !important;
   filter: none !important;
 }
 
-html[data-dream-skin="active"][data-dream-theme="internet-angel"].dream-theme-light
-  [data-radix-popper-content-wrapper] > div,
-html[data-dream-skin="active"][data-dream-theme="internet-angel"].dream-theme-light
-  [data-radix-menu-content],
-html[data-dream-skin="active"][data-dream-theme="internet-angel"].dream-theme-light
-  [data-radix-popover-content] {
-  color: var(--dream-text) !important;
-  background: color-mix(in oklab, var(--dream-surface-raised) 96%, transparent) !important;
+html[data-dream-skin="active"][data-dream-theme="internet-angel"]:is(.dream-theme-light, [data-dream-shell="light"])
+  [data-radix-popper-content-wrapper] > div:not([data-angel-component="settings-menu"]),
+html[data-dream-skin="active"][data-dream-theme="internet-angel"]:is(.dream-theme-light, [data-dream-shell="light"])
+  [data-radix-menu-content]:not([data-angel-component="settings-menu"]),
+html[data-dream-skin="active"][data-dream-theme="internet-angel"]:is(.dream-theme-light, [data-dream-shell="light"])
+  [data-radix-popover-content]:not([data-angel-component="settings-menu"]) {
+  color: var(--angel-adaptive-text) !important;
+  background: color-mix(in oklab, var(--angel-adaptive-surface-raised) 96%, transparent) !important;
   border: 2px solid var(--angel-blue) !important;
   border-radius: 6px !important;
   box-shadow:
@@ -1558,63 +1733,183 @@ html[data-dream-skin="active"][data-dream-theme="internet-angel"].dream-theme-li
     3px 3px 0 color-mix(in oklab, var(--angel-pink) 48%, transparent) !important;
 }
 
-html[data-dream-skin="active"][data-dream-theme="internet-angel"].dream-theme-light
-  [role="tooltip"],
-html[data-dream-skin="active"][data-dream-theme="internet-angel"].dream-theme-light
-  [data-radix-tooltip-content],
-html[data-dream-skin="active"][data-dream-theme="internet-angel"].dream-theme-light
-  [data-slot="tooltip-content"] {
-  color: var(--dream-text) !important;
+html[data-dream-skin="active"][data-dream-theme="internet-angel"]:is(.dream-theme-light, [data-dream-shell="light"]) :is(
+  [data-radix-popper-content-wrapper] > div,
+  [data-radix-menu-content],
+  [data-radix-popover-content]
+) :is(
+  [role="menuitem"],
+  [role="menuitemradio"],
+  [role="menuitemcheckbox"],
+  [role="option"]
+):not(:is(:hover, :focus, [data-highlighted], [aria-selected="true"])):not([data-angel-component="settings-menu"] *) {
+  color: color-mix(in srgb, var(--angel-adaptive-text) 90%, var(--angel-cyan)) !important;
+}
+
+html[data-dream-skin="active"][data-dream-theme="internet-angel"]:is(.dream-theme-light, [data-dream-shell="light"])
+  [role="tooltip"]:not([data-angel-component="turn-preview"]),
+html[data-dream-skin="active"][data-dream-theme="internet-angel"]:is(.dream-theme-light, [data-dream-shell="light"])
+  [data-radix-tooltip-content]:not([data-angel-component="turn-preview"]),
+html[data-dream-skin="active"][data-dream-theme="internet-angel"]:is(.dream-theme-light, [data-dream-shell="light"])
+  [data-slot="tooltip-content"]:not([data-angel-component="turn-preview"]) {
+  color: var(--angel-adaptive-text) !important;
   border: 2px solid var(--angel-blue) !important;
   border-radius: 7px !important;
-  background: color-mix(in oklab, var(--dream-surface-raised) 94%, transparent) !important;
+  background: color-mix(in oklab, var(--angel-adaptive-surface-raised) 94%, transparent) !important;
   box-shadow:
     inset 3px 0 var(--angel-cyan),
     3px 3px 0 color-mix(in oklab, var(--angel-pink) 52%, transparent) !important;
 }
 
-html[data-dream-skin="active"][data-dream-theme="internet-angel"].dream-theme-light
+html[data-dream-skin="active"][data-dream-theme="internet-angel"]:is(.dream-theme-light, [data-dream-shell="light"])
   [role="tooltip"] :where(p, span, div, li, td, th, h1, h2, h3),
-html[data-dream-skin="active"][data-dream-theme="internet-angel"].dream-theme-light
+html[data-dream-skin="active"][data-dream-theme="internet-angel"]:is(.dream-theme-light, [data-dream-shell="light"])
   [data-radix-tooltip-content] :where(p, span, div, li, td, th, h1, h2, h3),
-html[data-dream-skin="active"][data-dream-theme="internet-angel"].dream-theme-light
+html[data-dream-skin="active"][data-dream-theme="internet-angel"]:is(.dream-theme-light, [data-dream-shell="light"])
   [data-slot="tooltip-content"] :where(p, span, div, li, td, th, h1, h2, h3) {
-  color: var(--dream-text) !important;
+  color: var(--angel-adaptive-text) !important;
 }
 
-html[data-dream-skin="active"][data-dream-theme="internet-angel"].dream-theme-light
-  [data-angel-component="edited-card-files"] button,
-html[data-dream-skin="active"][data-dream-theme="internet-angel"].dream-theme-light
-  [data-angel-component="edited-card-files"] button * {
-  color: var(--dream-text) !important;
+/* Light-mode fixed dark surfaces keep readable light glyphs. */
+html[data-dream-skin="active"][data-dream-theme="internet-angel"]:is(.dream-theme-light, [data-dream-shell="light"]) :is(
+  [data-angel-component="composer"],
+  [data-angel-component="context-strip"],
+  [data-angel-component="active-goal-strip"],
+  [data-angel-component="changes-shell"],
+  [data-angel-component="changes-pill"],
+  [data-angel-component="side-workspace"],
+  [data-angel-component="composer-palette"],
+  [data-angel-component="settings-sidebar"],
+  [data-angel-component="settings-content"],
+  [data-angel-component="settings-search"],
+  [data-angel-component="settings-surface"],
+  [data-angel-component="settings-menu"],
+  [data-angel-component="terminal-panel"],
+  [data-angel-component="summary-panel"],
+  [data-angel-component="side-chat"],
+  [data-angel-component="activity-detail"],
+  [data-angel-component="activity-output"],
+  [data-angel-component="selection-actions"],
+  [data-angel-component="turn-preview"],
+  [data-angel-component="turn-preview-surface"],
+  [data-angel-component="edited-card"],
+  [data-angel-component="edited-card-files"],
+  [data-angel-component="system-toast"],
+  [data-angel-component="subagent-frame"],
+  [data-angel-component="permission"]
+) {
+  color: var(--angel-paper) !important;
 }
 
-html[data-dream-skin="active"][data-dream-theme="internet-angel"].dream-theme-light
+html[data-dream-skin="active"][data-dream-theme="internet-angel"]:is(.dream-theme-light, [data-dream-shell="light"]) :is(
+  [data-angel-component="composer"],
+  [data-angel-component="context-strip"],
+  [data-angel-component="active-goal-strip"],
+  [data-angel-component="changes-shell"],
+  [data-angel-component="changes-pill"],
+  [data-angel-component="side-workspace"],
+  [data-angel-component="composer-palette"],
+  [data-angel-component="settings-sidebar"],
+  [data-angel-component="settings-content"],
+  [data-angel-component="settings-search"],
+  [data-angel-component="settings-surface"],
+  [data-angel-component="settings-menu"],
+  [data-angel-component="terminal-panel"],
+  [data-angel-component="summary-panel"],
+  [data-angel-component="side-chat"],
+  [data-angel-component="activity-detail"],
+  [data-angel-component="activity-output"],
+  [data-angel-component="selection-actions"],
+  [data-angel-component="turn-preview"],
+  [data-angel-component="turn-preview-surface"],
+  [data-angel-component="edited-card"],
+  [data-angel-component="edited-card-files"],
+  [data-angel-component="system-toast"],
+  [data-angel-component="subagent-frame"],
+  [data-angel-component="permission"]
+) :where(button, a, p, span, div, li, h1, h2, h3, h4, h5, h6, label, td, th) {
+  color: var(--angel-paper) !important;
+}
+
+html[data-dream-skin="active"][data-dream-theme="internet-angel"]:is(.dream-theme-light, [data-dream-shell="light"])
+  [data-angel-component="settings-content"] :is(:where(button, input, textarea):disabled, [aria-disabled="true"]),
+html[data-dream-skin="active"][data-dream-theme="internet-angel"]:is(.dream-theme-light, [data-dream-shell="light"])
+  [data-angel-component="settings-content"] :is(:where(button, input, textarea):disabled, [aria-disabled="true"])
+  :where(button, a, p, span, div, li, label) {
+  color: color-mix(in srgb, var(--angel-paper) 72%, var(--angel-violet)) !important;
+}
+
+html[data-dream-skin="active"][data-dream-theme="internet-angel"]:is(.dream-theme-light, [data-dream-shell="light"]) :is(
+  [data-angel-component="composer-palette-heading"],
+  [data-angel-component="turn-preview-title"],
+  [data-angel-component="edited-card-title"],
+  [data-angel-component="edited-card-more"],
+  [data-angel-component="subagent-more"]
+),
+html[data-dream-skin="active"][data-dream-theme="internet-angel"]:is(.dream-theme-light, [data-dream-shell="light"]) :is(
+  [data-angel-component="composer-palette-heading"],
+  [data-angel-component="turn-preview-title"],
+  [data-angel-component="edited-card-title"],
+  [data-angel-component="edited-card-more"],
+  [data-angel-component="subagent-more"]
+) :where(button, a, p, span, div, li, label) {
+  color: var(--angel-cyan) !important;
+}
+
+html[data-dream-skin="active"][data-dream-theme="internet-angel"]:is(.dream-theme-light, [data-dream-shell="light"])
+  [data-angel-component="turn-preview-excerpt"],
+html[data-dream-skin="active"][data-dream-theme="internet-angel"]:is(.dream-theme-light, [data-dream-shell="light"])
+  [data-angel-component="turn-preview-excerpt"] :where(button, a, p, span, div, li, label) {
+  color: rgb(236 229 255 / .78) !important;
+}
+
+html[data-dream-skin="active"][data-dream-theme="internet-angel"]:is(.dream-theme-light, [data-dream-shell="light"])
+  [data-angel-component="edited-card-stats"],
+html[data-dream-skin="active"][data-dream-theme="internet-angel"]:is(.dream-theme-light, [data-dream-shell="light"])
+  [data-angel-component="edited-card-stats"] :where(button, a, p, span, div, li, label) {
+  color: rgb(232 225 255 / .74) !important;
+}
+
+html[data-dream-skin="active"][data-dream-theme="internet-angel"]:is(.dream-theme-light, [data-dream-shell="light"])
+  [data-angel-component="edited-card-file-path"],
+html[data-dream-skin="active"][data-dream-theme="internet-angel"]:is(.dream-theme-light, [data-dream-shell="light"])
+  [data-angel-component="edited-card-file-path"] :where(button, a, p, span, div, li, label) {
+  color: color-mix(in srgb, var(--angel-paper) 86%, var(--angel-cyan)) !important;
+}
+
+html[data-dream-skin="active"][data-dream-theme="internet-angel"]:is(.dream-theme-light, [data-dream-shell="light"])
   [data-angel-component="edited-card-file-stats"],
-html[data-dream-skin="active"][data-dream-theme="internet-angel"].dream-theme-light
-  [data-angel-component="edited-card-file-path"] {
-  color: var(--dream-text) !important;
+html[data-dream-skin="active"][data-dream-theme="internet-angel"]:is(.dream-theme-light, [data-dream-shell="light"])
+  [data-angel-component="edited-card-file-stats"] :where(button, a, p, span, div, li, label) {
+  color: rgb(228 220 255 / .76) !important;
 }
 
-html.codex-dream-skin.dream-theme-light #codex-dream-skin-chrome .dream-angel-webcam-card,
-html.codex-dream-skin.dream-theme-light .dream-home button.dream-codex-preset > span:first-child > span:first-child,
-html.codex-dream-skin.dream-theme-light .dream-home .dream-preset-icon,
-html.codex-dream-skin.dream-theme-light .dream-home button.dream-generated-preset > span:first-child > span:first-child,
-html.codex-dream-skin.dream-theme-light .dream-home .group\/home-suggestions button > span:first-child > span:first-child,
-html.codex-dream-skin.dream-theme-light [data-angel-component="settings-content"] [role="switch"] > span[data-state] > span[data-state],
-html.codex-dream-skin.dream-theme-light [data-angel-component="settings-content"] [role="slider"],
-html.codex-dream-skin.dream-theme-light .dream-subagent-row > svg:first-child,
-html.codex-dream-skin.dream-theme-light .dream-subagent-row-archive > svg:first-child {
-  background: var(--dream-surface-raised) !important;
+html[data-dream-skin="active"][data-dream-theme="internet-angel"]:is(.dream-theme-light, [data-dream-shell="light"])
+  [data-angel-component="side-workspace"] [aria-selected="true"],
+html[data-dream-skin="active"][data-dream-theme="internet-angel"]:is(.dream-theme-light, [data-dream-shell="light"])
+  [data-angel-component="side-workspace"] [aria-selected="true"] :where(button, a, p, span, div, li, h1, h2, h3, h4, h5, h6, label, td, th) {
+  color: var(--angel-cyan) !important;
 }
 
-html.codex-dream-skin.dream-theme-light .dream-home [data-feature="game-source"]::before,
-html.codex-dream-skin.dream-theme-light .dream-home [data-feature="game-source"] button,
-html.codex-dream-skin.dream-theme-light #codex-dream-skin-chrome .dream-angel-dose-strip i,
-html.codex-dream-skin.dream-theme-light .dream-side-workspace::before {
-  color: var(--dream-text) !important;
+html.codex-dream-skin:is(.dream-theme-light, [data-dream-shell="light"]) #codex-dream-skin-chrome .dream-angel-webcam-card,
+html.codex-dream-skin:is(.dream-theme-light, [data-dream-shell="light"]) .dream-home button.dream-codex-preset > span:first-child > span:first-child,
+html.codex-dream-skin:is(.dream-theme-light, [data-dream-shell="light"]) .dream-home .dream-preset-icon,
+html.codex-dream-skin:is(.dream-theme-light, [data-dream-shell="light"]) .dream-home button.dream-generated-preset > span:first-child > span:first-child,
+html.codex-dream-skin:is(.dream-theme-light, [data-dream-shell="light"]) .dream-home .group\/home-suggestions button > span:first-child > span:first-child,
+html.codex-dream-skin:is(.dream-theme-light, [data-dream-shell="light"]) [data-angel-component="settings-content"] [role="switch"] > span[data-state] > span[data-state],
+html.codex-dream-skin:is(.dream-theme-light, [data-dream-shell="light"]) [data-angel-component="settings-content"] [role="slider"],
+html.codex-dream-skin:is(.dream-theme-light, [data-dream-shell="light"]) .dream-subagent-row > svg:first-child,
+html.codex-dream-skin:is(.dream-theme-light, [data-dream-shell="light"]) .dream-subagent-row-archive > svg:first-child {
+  background: var(--angel-adaptive-surface-raised) !important;
+}
+
+html.codex-dream-skin:is(.dream-theme-light, [data-dream-shell="light"]) .dream-home [data-feature="game-source"]::before,
+html.codex-dream-skin:is(.dream-theme-light, [data-dream-shell="light"]) .dream-home [data-feature="game-source"] button,
+html.codex-dream-skin:is(.dream-theme-light, [data-dream-shell="light"]) #codex-dream-skin-chrome .dream-angel-dose-strip i,
+html.codex-dream-skin:is(.dream-theme-light, [data-dream-shell="light"]) .dream-side-workspace::before {
+  color: var(--angel-adaptive-text) !important;
   background: linear-gradient(90deg,
     var(--angel-cyan),
-    var(--dream-surface-raised) 48%,
+    var(--angel-adaptive-surface-raised) 48%,
     var(--angel-pink)) !important;
 }

@@ -605,7 +605,7 @@
     const main = resolvedMainNode();
     const mainParent = main?.parentElement;
     if (!main || !mainParent) return [];
-    const candidate = genericNodes('aside, nav[aria-label]')
+    const candidate = genericNodes('nav[aria-label]')
       .filter((node) => !main.contains?.(node))
       .filter((node) => !node.closest?.('[role="dialog"], [aria-modal="true"]'))
       .find((node) => node.parentElement === mainParent
@@ -613,19 +613,43 @@
         || node.parentElement === mainParent.parentElement);
     return candidate ? [candidate] : [];
   };
-  const fallbackComposerNodes = () => selectorNodes("composer-chrome").length
-    ? [] : (() => {
-      const main = resolvedMainNode();
-      for (const input of genericInputNodes()) {
-        if (main && !main.contains?.(input)) continue;
-        const owner = input.closest?.(
-          '[data-testid*="composer" i], [data-testid*="prompt" i], ' +
-          '[class*="composer" i], [class*="prompt" i]',
-        );
-        if (owner && (!main || main.contains?.(owner))) return [owner];
+  const genericComposerRejectSelector = [
+    '[data-composer-footer-responsive]',
+    '[class*="ComposerLayoutFooter" i]',
+    '[class*="ComposerLayoutToolbar" i]',
+    '[class*="ComposerLayoutEditor" i]',
+    '[class*="composer-footer" i]',
+    '[class*="composer-toolbar" i]',
+    '[class*="composer-editor" i]',
+  ].join(", ");
+  const genericComposerOwnerSelector = [
+    '[data-testid*="composer" i]',
+    '[data-testid*="prompt" i]',
+    '[class*="composer" i]',
+    '[class*="prompt" i]',
+  ].join(", ");
+  const fallbackComposerNodes = () => {
+    const main = resolvedMainNode();
+    const canonical = selectorNodes("composer-chrome");
+    const leftSidebars = [
+      ...selectorNodes("left-panel"),
+      ...selectorNodes("floating-left-panel"),
+      ...fallbackSidebarNodes(),
+    ];
+    const owners = new Set();
+    for (const input of genericInputNodes()) {
+      if (canonical.some((composer) => composer.contains?.(input))) continue;
+      const root = input.closest?.('[class*="ComposerLayoutRoot" i]');
+      let owner = root || input.closest?.(genericComposerOwnerSelector);
+      while (!root && owner?.matches?.(genericComposerRejectSelector)) {
+        owner = owner.parentElement?.closest?.(genericComposerOwnerSelector);
       }
-      return [];
-    })();
+      if (!owner ||
+        leftSidebars.some((sidebar) => sidebar.contains?.(owner))) continue;
+      if (!main || main.contains?.(owner) || root?.closest?.("aside")) owners.add(owner);
+    }
+    return [...owners];
+  };
   const addPart = (desired, part, nodes) => {
     for (const node of nodes) {
       if (node && typeof node.setAttribute === "function" && !desired.has(node)) {

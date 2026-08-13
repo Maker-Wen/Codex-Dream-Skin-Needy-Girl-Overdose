@@ -1277,8 +1277,10 @@ export async function verifySession(session, expectedThemeId = null, expectedRev
     const styleProbe = (node) => {
       if (!node) return null;
       const style = getComputedStyle(node);
+      const accentStyle = getComputedStyle(node, '::before');
       return {
         component: node.getAttribute('data-angel-component'),
+        accentImage: accentStyle.backgroundImage,
         backgroundColor: style.backgroundColor,
         backgroundImage: style.backgroundImage,
         borderColor: style.borderColor,
@@ -1364,6 +1366,7 @@ export async function verifySession(session, expectedThemeId = null, expectedRev
       document.getElementById('codex-dream-skin-style') === runtime.styleNode;
     const result = {
       installed: document.documentElement.getAttribute('data-dream-skin') === 'active',
+      shellAppearance: document.documentElement.getAttribute('data-dream-shell'),
       documentVisibility: document.visibilityState,
       version: runtime?.version ?? null,
       themeId: runtime?.themeId ?? null,
@@ -1453,10 +1456,15 @@ export async function verifySession(session, expectedThemeId = null, expectedRev
       result.composerStyle.backgroundImage !== 'none' &&
       composerClearOfSidebar && composerInsideViewport
     );
+    const environmentBorderWidth = parseFloat(result.environmentStyle?.borderWidth || '0');
+    const environmentSurfacePass = result.shellAppearance === 'light'
+      ? environmentBorderWidth >= 1 && ![
+          'transparent', 'rgba(0, 0, 0, 0)',
+        ].includes(result.environmentStyle?.backgroundColor)
+      : environmentBorderWidth >= 1.5 && result.environmentStyle?.backgroundImage !== 'none';
     const environmentAngelPass = !angelThemeExpected || !result.environment?.visible || Boolean(
       result.environmentStyle?.component === 'environment' &&
-      parseFloat(result.environmentStyle.borderWidth || '0') >= 1.5 &&
-      result.environmentStyle.backgroundImage !== 'none' && environmentInsideViewport
+      result.environmentStyle.accentImage !== 'none' && environmentSurfacePass && environmentInsideViewport
     );
     const sidebarAngelPass = !angelThemeExpected || !result.sidebar?.visible || Boolean(
       result.sidebarCoverage.every((item) =>
@@ -1576,6 +1584,7 @@ function verificationFailureMessage(prefix, verification) {
     expectedRevision: verification.expectedRevision,
     stylePresent: verification.stylePresent,
     styleMode: verification.styleMode,
+    shellAppearance: verification.shellAppearance,
     scope: verification.scope,
     homeRoute: verification.homeRoute,
     homePresent: verification.homePresent,

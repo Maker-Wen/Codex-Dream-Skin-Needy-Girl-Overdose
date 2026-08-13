@@ -18,10 +18,12 @@ const appDelegatePath = path.join(
 );
 const overlayCssPath = path.join(macosRoot, "assets", "internet-angel-extension.css");
 const overlayScriptPath = path.join(macosRoot, "assets", "internet-angel-extension.js");
+const runtimeOverlayScriptPath = path.join(macosRoot, "..", "runtime", "internet-angel-extension.js");
 const windowsRoot = path.resolve(macosRoot, "..", "windows");
 const shellSelector = 'main:is(.main-surface, [data-app-shell-main-surface], [class*="_MainContentSurface_"])';
-const composerSelector = ':is(.composer-surface-chrome, [data-composer-surface-variant])';
+const composerSelector = ':is(.composer-surface-chrome, [data-composer-surface-variant], [data-ds-part="composer"])';
 const composerFooterSelector = ':is([class*="_footer_"], [data-composer-footer-responsive])';
+const assistantMarkdownSelector = '[data-markdown-text-style="assistant-message"]';
 
 async function isFile(filePath) {
   try {
@@ -45,12 +47,14 @@ const doctorSource = await fs.readFile(doctorPath, "utf8");
 const appDelegateSource = await fs.readFile(appDelegatePath, "utf8");
 const overlayCss = await fs.readFile(overlayCssPath, "utf8");
 const overlayScript = await fs.readFile(overlayScriptPath, "utf8");
+const runtimeOverlayScript = await fs.readFile(runtimeOverlayScriptPath, "utf8");
 const baseCss = await fs.readFile(path.join(macosRoot, "assets", "dream-skin.css"), "utf8");
+const runtimeCss = await fs.readFile(path.join(macosRoot, "..", "runtime", "dream-skin.css"), "utf8");
 const windowsRenderer = await fs.readFile(path.join(windowsRoot, "assets", "renderer-inject.js"), "utf8");
 const windowsCss = await fs.readFile(path.join(windowsRoot, "assets", "dream-skin.css"), "utf8");
 
-function assertCssRule(selectorFragments, declarationPattern, message) {
-  const rules = overlayCss.match(/[^{}]+\{[^{}]*\}/g) || [];
+function assertCssRule(selectorFragments, declarationPattern, message, css = overlayCss) {
+  const rules = css.match(/[^{}]+\{[^{}]*\}/g) || [];
   assert.ok(rules.some((rule) => {
     const boundary = rule.indexOf("{");
     const selector = rule.slice(0, boundary);
@@ -223,7 +227,147 @@ assert.ok(
   ),
   "The Codex 26.730 composer must receive the same immersive Internet Angel override.",
 );
+assertCssRule(
+  [
+    'html[data-dream-skin="active"] [data-ds-part="composer"]',
+    'aside:not(__DREAM_SELECTOR_LEFT_PANEL__):not([data-testid="app-shell-floating-left-panel"]):not([role="dialog"])',
+    '[class*="_ComposerLayoutRoot_"]',
+  ],
+  /color:\s*var\(--ds-text\)\s*!important[\s\S]*background:[\s\S]*var\(--ds-panel-2\)[\s\S]*border:[\s\S]*var\(--ds-line\)[\s\S]*box-shadow:/,
+  "macOS must paint the generic and right-panel Composer on the first frame like Windows.",
+  runtimeCss,
+);
+assertCssRule(
+  [
+    'html[data-dream-skin="active"]:has([data-angel-component="side-workspace"])',
+    '__DREAM_SELECTOR_SHELL_MAIN__:not(:has(__DREAM_SELECTOR_HOME_ROUTE_CSS__))',
+    '> __DREAM_SELECTOR_HEADER_TINT__::after',
+  ],
+  /content:\s*none/,
+  "A mounted side workspace must suppress task-header status chrome before it overlaps native tabs.",
+  runtimeCss,
+);
+assertCssRule(
+  [
+    'aside:not(__DREAM_SELECTOR_LEFT_PANEL__):not([data-testid="app-shell-floating-left-panel"])',
+    '[class*="_ComposerLayoutRoot_"]:has(',
+    'textarea',
+    '[contenteditable="true"]',
+    '[role="textbox"]',
+  ],
+  /background:/,
+  "The first-frame structural fallback must require an editable input and exclude both left sidebars.",
+  runtimeCss,
+);
+assertCssRule(
+  [
+    'html[data-dream-skin="active"] [data-ds-part="composer"]',
+    'aside:not(__DREAM_SELECTOR_LEFT_PANEL__):not([data-testid="app-shell-floating-left-panel"]):not([role="dialog"])',
+    '[class*="_ComposerLayoutRoot_"]',
+    '[class*="_ComposerLayoutFooter_"]',
+    '[class*="_RichTextInput_"]',
+    '[class*="_ComposerLayoutBody_"]',
+    '[class*="_ComposerLayoutAttachments_"]',
+    '[class*="rounded-2xl"]',
+  ],
+  /background:\s*transparent\s*!important[\s\S]*border:\s*0\s*!important[\s\S]*border-radius:\s*0\s*!important[\s\S]*box-shadow:\s*none\s*!important/,
+  "macOS must clear the same nested native Composer frames as Windows.",
+  runtimeCss,
+);
 assert.match(overlayCss, /outline:\s*2px solid var\(--angel-blue\)\s*!important/);
+assertCssRule(
+  [
+    'html[data-dream-skin="active"][data-dream-theme="internet-angel"] :where(',
+    '[data-radix-tooltip-content]',
+    '[data-slot="tooltip-content"]',
+  ],
+  /z-index:\s*10000\s*!important[\s\S]*max-width:\s*min\(320px, calc\(100vw - 24px\)\)\s*!important[\s\S]*padding:\s*6px 10px\s*!important[\s\S]*color:\s*color-mix\(in oklab, var\(--angel-cyan\) 34%, var\(--ds-text\)\)\s*!important[\s\S]*border:\s*1\.25px solid var\(--angel-cyan\)\s*!important[\s\S]*border-radius:\s*8\.75px\s*!important[\s\S]*background:[\s\S]*var\(--ds-panel-2\)[\s\S]*font-weight:\s*650\s*!important[\s\S]*overflow-wrap:\s*anywhere/,
+  "Dark macOS role-less Radix and slot portals must retain the Windows base surface.",
+  baseCss,
+);
+assertCssRule(
+  [
+    'html[data-dream-skin="active"][data-dream-theme="internet-angel"] :where(',
+    '[data-radix-tooltip-content]',
+    '[data-slot="tooltip-content"]',
+    ') > svg',
+  ],
+  /color:\s*var\(--ds-panel-2\)\s*!important[\s\S]*fill:\s*var\(--ds-panel-2\)\s*!important/,
+  "Dark macOS role-less portal arrows must match the Windows raised surface.",
+  baseCss,
+);
+const rolelessTooltipOverlayRules = (overlayCss.match(/[^{}]+\{[^{}]*\}/g) || [])
+  .filter((rule) => /\[data-(?:radix-tooltip-content|slot="tooltip-content")\]/.test(rule.slice(0, rule.indexOf("{"))));
+assert.ok(rolelessTooltipOverlayRules.length > 0);
+assert.ok(
+  rolelessTooltipOverlayRules.every((rule) => rule.includes(':is(.dream-theme-light, [data-dream-shell="light"])')),
+  "The shared extension must not replace the Dark role-less Windows base surface.",
+);
+assertCssRule(
+  ['[role="menu"]::before', '[role="listbox"]::before'],
+  /height:\s*3px[\s\S]*linear-gradient\(90deg, var\(--angel-cyan\)/,
+  "macOS menus must retain the Windows Internet Angel accent strip.",
+);
+assertCssRule(
+  ['[role="menu"] [role="separator"]'],
+  /height:\s*1px\s*!important[\s\S]*linear-gradient\(90deg/,
+  "macOS menu separators must retain the Windows cyan/pink gradient.",
+);
+assertCssRule(
+  ['[role="menu"] kbd', '[role="menuitem"] [class*="shortcut"]'],
+  /color:\s*var\(--angel-adaptive-muted\)\s*!important[\s\S]*font-family:\s*var\(--angel-font-mono\)\s*!important/,
+  "macOS menu shortcuts must retain the Windows muted monospace treatment.",
+);
+assertCssRule(
+  ['_MainContentFrame_', '[class~="sticky"]', '[class~="z-30"]::after'],
+  /background-image:\s*linear-gradient\(to bottom, transparent,[\s\S]*var\(--angel-adaptive-surface\)/,
+  "Projects and PR sticky headers must retain the Windows trailing fade.",
+);
+for (const [selectorFragments, declarationPattern] of [
+  [['[data-dream-theme="internet-angel"]', '[data-angel-component="composer"]'], /background:/],
+  [['[data-dream-theme="internet-angel"]', '[data-angel-component="composer"]',
+    '_ComposerLayoutFooter_', '_RichTextInput_', '_ComposerLayoutBody_', '_ComposerLayoutAttachments_'],
+  /background:\s*transparent\s*!important/],
+  [['[data-dream-theme="internet-angel"]', '_MainContentFrame_', 'bg-token-main-surface-primary'], /background:/],
+  [['[data-dream-theme="internet-angel"]', '[data-angel-component="side-workspace"]', 'file-diff'], /background:/],
+  [['[data-dream-theme="internet-angel"]', '[data-angel-component="side-workspace"]', 'file-diff', '> div'],
+  /background:\s*transparent\s*!important/],
+  [['[data-dream-theme="internet-angel"]', '[data-angel-component="side-workspace"]', 'file-diff', 'codeBlock'],
+  /background:/],
+]) {
+  assertCssRule(
+    selectorFragments,
+    declarationPattern,
+    `Missing shared macOS parity rule for ${selectorFragments.join(" ")}`,
+    overlayCss,
+  );
+}
+assertCssRule(
+  [
+    ':is(.dream-theme-light, [data-dream-shell="light"])',
+    '[data-radix-menu-content]',
+    '[role="menuitem"]',
+    ':not(:is(:hover, :focus, [data-highlighted], [aria-selected="true"]))',
+    ':not([data-angel-component="settings-menu"] *)',
+  ],
+  /color:\s*color-mix\(in srgb, var\(--angel-adaptive-text\) 90%, var\(--angel-cyan\)\)\s*!important/,
+  "Idle items on Light-mode Radix surfaces must use adaptive text without overriding highlighted items.",
+);
+assert.doesNotMatch(
+  overlayCss,
+  /\[class\*="_MainContentFrame_"\]\s+input(?=\s*\{|::placeholder)/,
+  "MainContentFrame parity must not repaint every native input type.",
+);
+assert.doesNotMatch(
+  baseCss,
+  /\[data-dream-theme="internet-angel"\][^{]+\[data-ds-part="composer"\]/,
+  "Internet Angel composer parity must live in the shared extension, not macOS base CSS.",
+);
+assert.doesNotMatch(
+  baseCss,
+  /\[data-dream-theme="internet-angel"\][^{]+_MainContentFrame_/,
+  "Projects and PR parity must live in the shared extension, not macOS base CSS.",
+);
 assert.ok(
   overlayScript.includes('[data-testid="app-shell-floating-left-panel"]'),
   "The collapsed hover sidebar must enter the same Internet Angel component lifecycle as the fixed sidebar.",
@@ -334,6 +478,11 @@ assertCssRule(
   ['html:root', '[data-angel-component="side-workspace"]'],
   /background:\s*[\s\S]*!important/,
   "Explicit workspace paint must outrank the base token-surface transparency rule.",
+);
+assert.match(
+  sideWorkspaceRule,
+  /linear-gradient\(155deg/,
+  "The restored parity skin must retain the first version's side-workspace gradient.",
 );
 assert.doesNotMatch(
   sideWorkspaceRule,
@@ -489,17 +638,40 @@ class FixtureNode {
   }
 }
 
-function makeOverlayFixture({ delayedWorkspaceEvidence = false, modernComposer = false } = {}) {
+function makeOverlayFixture({
+  delayedDiffRoot = false,
+  delayedPublicComposer = false,
+  delayedWorkspaceEvidence = false,
+  modernComposer = false,
+  publicComposerOnly = false,
+  publicSidebarOnly = false,
+} = {}) {
   const nodes = [];
+  class OverlayFixtureNode extends FixtureNode {
+    attachShadow() {
+      this.shadowRoot = this.pendingShadowRoot;
+      return this.shadowRoot;
+    }
+  }
+  const nativeAttachShadow = OverlayFixtureNode.prototype.attachShadow;
   const makeNode = (options) => {
-    const node = new FixtureNode(options);
+    const node = new OverlayFixtureNode(options);
     nodes.push(node);
     return node;
   };
-  const composer = makeNode({ className: modernComposer ? "_ComposerLayoutRoot_fixture" : "composer-surface-chrome" });
+  const composer = makeNode({
+    className: modernComposer || publicComposerOnly || delayedPublicComposer
+      ? "_ComposerLayoutRoot_fixture"
+      : "composer-surface-chrome",
+  });
   if (modernComposer) composer.setAttribute("data-composer-surface-variant", "default");
-  const composerFooter = makeNode({ className: modernComposer ? "flex items-center" : "_footer_fixture" });
-  if (modernComposer) composerFooter.setAttribute("data-composer-footer-responsive", "true");
+  if (publicComposerOnly) composer.setAttribute("data-ds-part", "composer");
+  const composerFooter = makeNode({
+    className: modernComposer || publicComposerOnly ? "flex items-center" : "_footer_fixture",
+  });
+  if (modernComposer || publicComposerOnly) {
+    composerFooter.setAttribute("data-composer-footer-responsive", "true");
+  }
   const editor = makeNode();
   const send = makeNode();
   const goalMode = makeNode({ text: "Goal" });
@@ -650,17 +822,22 @@ function makeOverlayFixture({ delayedWorkspaceEvidence = false, modernComposer =
     return { buttons, footer, help, mode, newTask, nodes: [footer, ...buttons], profile, row, search, section };
   };
 
-  const sidebarSelector = 'aside.app-shell-left-panel, [data-testid="app-shell-floating-left-panel"]';
+  const stableSidebarSelector = 'aside.app-shell-left-panel, [data-testid="app-shell-floating-left-panel"]';
+  const sidebarSelector = `${stableSidebarSelector}, [data-ds-part="sidebar"]`;
   const settingsNavSelector = 'nav:has([data-settings-panel-slug])';
   const settingsContentSelector = '[class~="scrollbar-stable"][class~="flex-1"][class~="overflow-y-auto"][class~="p-panel"]';
-  const sidebar = makeNode({ className: "app-shell-left-panel" });
+  const sidebar = makeNode({
+    className: publicSidebarOnly ? "flex min-h-0 flex-col" : "app-shell-left-panel",
+  });
+  if (publicSidebarOnly) sidebar.setAttribute("data-ds-part", "sidebar");
   leftWorkspace.closestNodes.set("aside", sidebar);
   leftWorkspace.closestNodes.set(sidebarSelector, sidebar);
+  leftWorkspace.closestNodes.set(stableSidebarSelector, sidebar);
   const sidebarControls = makeSidebarControls();
   sidebar.addQuery("button, [role=button]", sidebarControls.buttons);
   const floatingSidebar = makeNode({
     className: "flex h-full min-h-0 flex-col overflow-hidden",
-    matches: [':is(aside.app-shell-left-panel, [data-testid="app-shell-floating-left-panel"])'],
+    matches: [`:is(${stableSidebarSelector})`, `:is(${sidebarSelector})`],
   });
   floatingSidebar.setAttribute("data-testid", "app-shell-floating-left-panel");
   const floatingSidebarControls = makeSidebarControls();
@@ -679,6 +856,7 @@ function makeOverlayFixture({ delayedWorkspaceEvidence = false, modernComposer =
   settingsSidebar.parentElement = settingsLayout;
   settingsNav.parentElement = settingsSidebar;
   settingsNav.closestNodes.set(sidebarSelector, settingsSidebar);
+  settingsNav.closestNodes.set(stableSidebarSelector, settingsSidebar);
   settingsScroll.parentElement = settingsContent;
   settingsContent.parentElement = settingsLayout;
   unrelatedSettingsScroll.parentElement = unrelatedSettingsContent;
@@ -719,6 +897,8 @@ function makeOverlayFixture({ delayedWorkspaceEvidence = false, modernComposer =
     assistantMessageAction,
   );
   assistantUnit.addQuery('[data-response-annotation-target]', assistantMessage);
+  const currentAssistantMessage = makeNode({ matches: [assistantMarkdownSelector] });
+  currentAssistantMessage.setAttribute("data-markdown-text-style", "assistant-message");
 
   const activity = makeNode();
   activity.setAttribute("data-local-conversation-item-target-ids", "exec-1");
@@ -805,11 +985,43 @@ function makeOverlayFixture({ delayedWorkspaceEvidence = false, modernComposer =
   systemToast.isConnected = false;
   systemToastAction.isConnected = false;
 
+  const diffThemeAttribute = "data-internet-angel-diff-theme";
+  const shadowMutationCallbacks = [];
+  const queueShadowMutation = (record) => {
+    for (const observer of observers) {
+      if (observer.target !== diffShadowRoot || observer.disconnected) continue;
+      shadowMutationCallbacks.push(() => observer.callback([record]));
+    }
+  };
+  const diffShadowRoot = {
+    children: [],
+    appendChild(node) {
+      node.parentNode = this;
+      this.children.push(node);
+      queueShadowMutation({ type: "childList", target: this, addedNodes: [node], removedNodes: [] });
+      return node;
+    },
+    querySelector(selector) {
+      if (selector !== `style[${diffThemeAttribute}]`) return null;
+      return this.children.find((node) => node.getAttribute?.(diffThemeAttribute) !== null) || null;
+    },
+    replaceChildren(...children) {
+      const removedNodes = this.children;
+      for (const node of removedNodes) node.parentNode = null;
+      this.children = children;
+      for (const node of children) node.parentNode = this;
+      queueShadowMutation({ type: "childList", target: this, addedNodes: children, removedNodes });
+    },
+  };
+  const diffsHost = makeNode({ matches: ["diffs-container"] });
+  diffsHost.pendingShadowRoot = diffShadowRoot;
+  diffsHost.shadowRoot = delayedDiffRoot ? null : diffShadowRoot;
+
   const shell = makeNode();
   const body = makeNode();
   sidebar.parentElement = body;
   const documentQueries = new Map([
-    [composerSelector, [composer]],
+    [composerSelector, delayedPublicComposer ? [] : [composer]],
     [`${shellSelector} [class~="sticky"][class~="bottom-0"]`, [sticky]],
     ['div[class*="bg-token-dropdown-background"][class~="rounded-3xl"]', [
       environment,
@@ -831,19 +1043,38 @@ function makeOverlayFixture({ delayedWorkspaceEvidence = false, modernComposer =
     ['[data-user-message-bubble="true"]', [userBubble]],
     ['[data-content-search-unit-key$=":user"]', [userUnit]],
     ['[data-content-search-unit-key$=":assistant"]', [assistantUnit]],
+    [assistantMarkdownSelector, [currentAssistantMessage]],
     ['[data-local-conversation-item-target-ids]', [activity]],
     ['[class*="group/activity-header"]', [activityHeader, streamingActivityHeader]],
     ['[class*="group/turn-diff-header"]', [editedHeader]],
     ['button:has([class*="git-decoration-added"]):has([class*="git-decoration-deleted"])', [changesPill]],
+    [stableSidebarSelector, publicSidebarOnly ? [] : [sidebar]],
     [sidebarSelector, [sidebar]],
     ['div.vertical-scroll-fade-mask[class~="overflow-y-auto"]', [paletteScroll]],
     ['button[class*="navigation-row"]', [turnRow]],
     [settingsNavSelector, [settingsNav]],
     [settingsContentSelector, [unrelatedSettingsScroll, settingsScroll]],
+    ["diffs-container", [diffsHost]],
     ["body div, body section, body aside", []],
   ]);
   const document = {
     body,
+    createElement(tagName) {
+      assert.equal(tagName, "style");
+      const attributes = new Map();
+      return {
+        parentNode: null,
+        textContent: "",
+        get isConnected() { return Boolean(this.parentNode && diffsHost.isConnected); },
+        getAttribute(name) { return attributes.get(name) ?? null; },
+        setAttribute(name, value) { attributes.set(name, String(value)); },
+        remove() {
+          if (!this.parentNode) return;
+          this.parentNode.children = this.parentNode.children.filter((node) => node !== this);
+          this.parentNode = null;
+        },
+      };
+    },
     querySelector(selector) {
       if (selector === shellSelector) return shell;
       return (documentQueries.get(selector) || [])[0] || null;
@@ -888,12 +1119,15 @@ function makeOverlayFixture({ delayedWorkspaceEvidence = false, modernComposer =
     context: {
       document,
       innerWidth: 1678,
+      Element: OverlayFixtureNode,
       MutationObserver: MockMutationObserver,
       window,
       setTimeout(callback, delay) { const id = ++nextTimer; timers.set(id, { callback, delay }); return id; },
       clearTimeout(id) { timers.delete(id); },
     },
     contextStrip,
+    diffsHost,
+    diffShadowRoot,
     editor,
     environment,
     environmentAction,
@@ -926,6 +1160,7 @@ function makeOverlayFixture({ delayedWorkspaceEvidence = false, modernComposer =
     activityOutput,
     assistantMessage,
     assistantMessageAction,
+    currentAssistantMessage,
     editedActions,
     editedCard,
     editedFileButton,
@@ -950,6 +1185,7 @@ function makeOverlayFixture({ delayedWorkspaceEvidence = false, modernComposer =
     leftWorkspace,
     lookalike,
     nodes,
+    nativeAttachShadow,
     observers,
     send,
     sidebar,
@@ -984,11 +1220,18 @@ function makeOverlayFixture({ delayedWorkspaceEvidence = false, modernComposer =
     userMessageAction,
     timers,
     bodyMutation(record) { notifyBodyMutation(record); },
+    attachDiffRoot() { return diffsHost.attachShadow({ mode: "open" }); },
+    detachDiffHost() { diffsHost.isConnected = false; },
     flushFrames() {
       const queued = [...frames.values()];
       frames.clear();
       for (const callback of queued) callback();
     },
+    flushShadowMutations() {
+      const queued = shadowMutationCallbacks.splice(0);
+      for (const callback of queued) callback();
+    },
+    get shadowMutationCount() { return shadowMutationCallbacks.length; },
     flushTimers() {
       const queued = [...timers.values()];
       timers.clear();
@@ -1018,8 +1261,20 @@ function makeOverlayFixture({ delayedWorkspaceEvidence = false, modernComposer =
         removedNodes: [],
       });
     },
+    publishComposerPart() {
+      composer.setAttribute("data-ds-part", "composer");
+      documentQueries.set(composerSelector, [composer]);
+      notifyBodyMutation({
+        type: "attributes",
+        target: composer,
+        attributeName: "data-ds-part",
+        addedNodes: [],
+        removedNodes: [],
+      });
+    },
     removeFixedSidebar() {
       documentQueries.set(sidebarSelector, []);
+      documentQueries.set(stableSidebarSelector, []);
       for (const node of fixedSidebarNodes) node.isConnected = false;
       sidebar.parentElement = null;
       notifyBodyMutation({ type: "childList", target: body, addedNodes: [], removedNodes: [sidebar] });
@@ -1028,12 +1283,14 @@ function makeOverlayFixture({ delayedWorkspaceEvidence = false, modernComposer =
       for (const node of floatingSidebarNodes) node.isConnected = true;
       floatingSidebar.parentElement = body;
       documentQueries.set(sidebarSelector, [floatingSidebar]);
+      documentQueries.set(stableSidebarSelector, [floatingSidebar]);
       notifyBodyMutation({ type: "childList", target: body, addedNodes: [floatingSidebar], removedNodes: [] });
     },
     mountFloatingSidebarAlongsideFixed() {
       for (const node of floatingSidebarNodes) node.isConnected = true;
       floatingSidebar.parentElement = body;
       documentQueries.set(sidebarSelector, [sidebar, floatingSidebar]);
+      documentQueries.set(stableSidebarSelector, [sidebar, floatingSidebar]);
       notifyBodyMutation({ type: "childList", target: body, addedNodes: [floatingSidebar], removedNodes: [] });
     },
     removeWorkspaceEvidence() {
@@ -1069,22 +1326,25 @@ function makeOverlayFixture({ delayedWorkspaceEvidence = false, modernComposer =
 }
 
 const registryKey = "__CODEX_INTERNET_ANGEL_EXTENSION_STATE__";
-const activateOverlayFixture = (options) => {
+const activateOverlayFixture = (options, source = overlayScript) => {
   const activeFixture = makeOverlayFixture(options);
   vm.runInNewContext(
-    overlayScript.replace("__INTERNET_ANGEL_EXTENSION_ENABLED_JSON__", "true"),
+    source.replace("__INTERNET_ANGEL_EXTENSION_ENABLED_JSON__", "true"),
     activeFixture.context,
   );
   return activeFixture;
 };
-const cleanupOverlayFixture = (activeFixture) => vm.runInNewContext(
-  overlayScript.replace("__INTERNET_ANGEL_EXTENSION_ENABLED_JSON__", "false"),
+const cleanupOverlayFixture = (activeFixture, source = overlayScript) => vm.runInNewContext(
+  source.replace("__INTERNET_ANGEL_EXTENSION_ENABLED_JSON__", "false"),
   activeFixture.context,
 );
 
 const fixture = activateOverlayFixture();
 const component = (node) => node.getAttribute("data-angel-component");
 assert.equal(component(fixture.composer), "composer");
+assert.equal(fixture.diffShadowRoot.children.length, 1,
+  "The shared extension must theme the source viewer Shadow DOM.");
+assert.match(fixture.diffShadowRoot.children[0].textContent, /--diffs-bg/);
 assert.equal(component(fixture.composerFooter), "composer-footer");
 assert.equal(component(fixture.editor), "composer-input");
 assert.equal(component(fixture.send), "composer-action");
@@ -1109,6 +1369,96 @@ assert.equal(component(modernComposerFixture.composerFooter), "composer-footer",
 assert.equal(component(modernComposerFixture.editor), "composer-input");
 assert.equal(component(modernComposerFixture.send), "composer-action");
 assert.equal(component(modernComposerFixture.goalMode), "goal-mode-trigger");
+
+const publicComposerFixture = activateOverlayFixture({ publicComposerOnly: true });
+assert.equal(
+  component(publicComposerFixture.composer),
+  "composer",
+  "A validated generic composer exposed by the shared renderer must receive Angel styling.",
+);
+
+const delayedPublicComposer = activateOverlayFixture({ delayedPublicComposer: true });
+assert.equal(component(delayedPublicComposer.composer), null);
+delayedPublicComposer.publishComposerPart();
+delayedPublicComposer.flushFrames();
+assert.equal(
+  component(delayedPublicComposer.composer),
+  "composer",
+  "The extension must react when the renderer publishes a generic composer part after mount.",
+);
+
+const publicSidebarFixture = activateOverlayFixture({ publicSidebarOnly: true });
+assert.equal(publicSidebarFixture.sidebar.className.includes("app-shell-left-panel"), false);
+assert.equal(
+  component(publicSidebarFixture.sidebar),
+  "sidebar",
+  "A generic sidebar exposed through the public renderer part must stay isolated.",
+);
+
+const lateDiffFixture = activateOverlayFixture({ delayedDiffRoot: true }, runtimeOverlayScript);
+assert.equal(lateDiffFixture.diffShadowRoot.children.length, 0);
+for (let attempt = 0; attempt < 20 && lateDiffFixture.timers.size; attempt += 1) {
+  lateDiffFixture.flushTimers();
+}
+assert.equal(lateDiffFixture.timers.size, 0, "The bounded legacy Shadow retry window must be exhausted.");
+lateDiffFixture.attachDiffRoot();
+assert.equal(
+  lateDiffFixture.diffShadowRoot.children.length,
+  1,
+  "A diffs-container attaching Shadow DOM after the retry window must receive the shared style.",
+);
+lateDiffFixture.diffShadowRoot.replaceChildren();
+lateDiffFixture.flushShadowMutations();
+assert.equal(
+  lateDiffFixture.diffShadowRoot.children.length,
+  1,
+  "Replacing a live diff root must restore its renderer-owned stylesheet.",
+);
+lateDiffFixture.flushShadowMutations();
+assert.equal(lateDiffFixture.shadowMutationCount, 0, "Style restoration must settle without a loop.");
+assert.notEqual(lateDiffFixture.context.Element.prototype.attachShadow, lateDiffFixture.nativeAttachShadow);
+cleanupOverlayFixture(lateDiffFixture, runtimeOverlayScript);
+assert.equal(
+  lateDiffFixture.context.Element.prototype.attachShadow,
+  lateDiffFixture.nativeAttachShadow,
+  "Theme cleanup must restore the attachShadow implementation it wrapped.",
+);
+lateDiffFixture.diffShadowRoot.replaceChildren();
+lateDiffFixture.flushShadowMutations();
+assert.equal(
+  lateDiffFixture.diffShadowRoot.children.length,
+  0,
+  "A cleaned-up Shadow observer must not recreate theme styles.",
+);
+
+const replacedDiffFixture = activateOverlayFixture({}, runtimeOverlayScript);
+const replacedState = replacedDiffFixture.context.window[registryKey];
+const replacedRootObserver = replacedDiffFixture.observers.find(
+  (observer) => observer.target === replacedDiffFixture.diffShadowRoot,
+);
+assert.ok(replacedRootObserver, "The active diff root must have a lifecycle observer.");
+vm.runInNewContext(
+  runtimeOverlayScript.replace("__INTERNET_ANGEL_EXTENSION_ENABLED_JSON__", "true"),
+  replacedDiffFixture.context,
+);
+assert.notEqual(replacedDiffFixture.context.window[registryKey], replacedState);
+assert.equal(replacedRootObserver.disconnected, true, "Replacement must disconnect the old root observer.");
+assert.equal(replacedDiffFixture.diffShadowRoot.children.length, 1, "Replacement must keep one current style.");
+cleanupOverlayFixture(replacedDiffFixture, runtimeOverlayScript);
+assert.equal(replacedDiffFixture.context.Element.prototype.attachShadow, replacedDiffFixture.nativeAttachShadow);
+assert.equal(replacedDiffFixture.diffShadowRoot.children.length, 0);
+
+const detachedDiffFixture = activateOverlayFixture();
+detachedDiffFixture.detachDiffHost();
+detachedDiffFixture.window[registryKey].refresh();
+assert.equal(
+  detachedDiffFixture.diffShadowRoot.children.length,
+  0,
+  "A detached diff host must not retain a renderer-owned stylesheet.",
+);
+cleanupOverlayFixture(detachedDiffFixture);
+detachedDiffFixture.diffsHost.isConnected = true;
+assert.equal(detachedDiffFixture.diffShadowRoot.children.length, 0);
 assert.equal(component(fixture.environment), "environment");
 assert.equal(component(fixture.environmentSection), "environment-section");
 assert.equal(component(fixture.environmentHeader), "environment-header");
@@ -1198,6 +1548,11 @@ assert.equal(component(fixture.turnMarker), "turn-nav-marker-active");
 assert.equal(component(fixture.summaryPanel), "summary-panel");
 assert.equal(component(fixture.userBubble), "message-user");
 assert.equal(component(fixture.assistantMessage), "message-assistant");
+assert.equal(
+  component(fixture.currentAssistantMessage),
+  "message-assistant",
+  "Current Codex assistant Markdown must not inherit the native dark-shell foreground in Light mode.",
+);
 assert.equal(component(fixture.userMessageAction), "message-action");
 assert.equal(component(fixture.assistantMessageAction), "message-action");
 assert.equal(component(fixture.activity), "activity");
@@ -1221,12 +1576,19 @@ assert.equal(component(fixture.editedFilePath), "edited-card-file-path");
 assert.equal(component(fixture.editedFileStats), "edited-card-file-stats");
 assert.equal(component(fixture.editedMore), "edited-card-more");
 assert.equal(component(fixture.lookalike), null, "An incomplete Environment lookalike must stay native.");
-assert.equal(fixture.observers.length, 1, "Only the body mutation observer may be installed.");
-assert.equal(fixture.observers[0].target, fixture.context.document.body);
+const bodyObservers = fixture.observers.filter(
+  (observer) => observer.target === fixture.context.document.body,
+);
+assert.equal(bodyObservers.length, 1, "Only one observer may watch the document body.");
 assert.equal(
-  JSON.stringify(fixture.observers[0].options),
-  JSON.stringify({ childList: true, subtree: true }),
-  "The body observer options must be exactly childList + subtree.",
+  JSON.stringify(bodyObservers[0].options),
+  JSON.stringify({
+    attributes: true,
+    attributeFilter: ["data-ds-part"],
+    childList: true,
+    subtree: true,
+  }),
+  "The body observer must limit attribute work to the renderer's public part contract.",
 );
 assert.equal(typeof fixture.listeners.get("click"), "function");
 assert.equal(typeof fixture.listeners.get("resize"), "function");
@@ -1320,6 +1682,20 @@ assert.equal(ignoredMutations.frames.size, 0, "Text and ordinary message content
 assert.equal(ignoredMutations.timers.size, 0, "Text and ordinary message content must not request a timer.");
 assert.equal(ignoredMetrics.classifyRuns, 1);
 
+const currentAssistantMount = activateOverlayFixture({ delayedWorkspaceEvidence: true });
+const mountedAssistantMessage = new FixtureNode({ matches: [assistantMarkdownSelector] });
+currentAssistantMount.bodyMutation({
+  type: "childList",
+  target: currentAssistantMount.context.document.body,
+  addedNodes: [mountedAssistantMessage],
+  removedNodes: [],
+});
+assert.equal(
+  currentAssistantMount.frames.size,
+  1,
+  "Mounting current assistant Markdown must schedule classification without observing streamed text.",
+);
+
 const frameBeatsTimer = activateOverlayFixture({ delayedWorkspaceEvidence: true });
 const frameBeatsTimerMetrics = frameBeatsTimer.window[registryKey].metrics;
 frameBeatsTimer.listeners.get("click")({ target: { closest: () => ({}) } });
@@ -1403,6 +1779,8 @@ const assertCleaned = (activeFixture) => {
   assert.equal(activeFixture.timers.size, 0);
   assert.ok(activeFixture.observers.every((observer) => observer.disconnected === true));
   assert.equal(activeFixture.listeners.size, 0);
+  assert.equal(activeFixture.diffShadowRoot.children.length, 0,
+    "Theme switch cleanup must remove Shadow DOM diff styles.");
   assert.equal(
     activeFixture.nodes.some((node) => node.isConnected && component(node)),
     false,

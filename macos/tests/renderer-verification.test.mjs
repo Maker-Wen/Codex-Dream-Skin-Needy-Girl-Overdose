@@ -23,6 +23,7 @@ const selectors = {
   settings: selectorFor("appearance-radio"),
   themePreview: '[data-testid="theme-preview"]',
 };
+const environmentSelector = 'div[class*="bg-token-dropdown-background"][class~="rounded-3xl"]';
 for (const [key, selector] of Object.entries(selectors)) {
   assert.equal(typeof selector, "string", `missing selector fixture: ${key}`);
 }
@@ -34,6 +35,7 @@ function makeRect(width = 800, height = 600, x = 0, y = 0) {
 function makeElement({
   rect = makeRect(),
   style = {},
+  beforeStyle = {},
   checkVisibility = true,
   isConnected = true,
   attributes = {},
@@ -58,6 +60,7 @@ function makeElement({
       color: "rgb(0, 0, 0)",
       ...style,
     },
+    _beforeStyle: { backgroundImage: "none", ...beforeStyle },
     getBoundingClientRect: () => rect,
     getAttribute: (name) => attributes[name] ?? null,
     checkVisibility: () => checkVisibility,
@@ -75,12 +78,14 @@ function makeDomFixture({
   shellCandidates = [shell],
   sidebarCandidates = [sidebar],
   composerCandidates = [composer],
+  environmentCandidates = [],
   homeCandidates = [],
   homeIconCandidates = [],
   gameSourceCandidates = [],
   suggestionCandidates = [],
   settings = null,
   themeId = "fixture-theme",
+  shellAppearance = "dark",
   visibilityState = "visible",
   viewportWidth = 1280,
   viewportHeight = 800,
@@ -91,7 +96,11 @@ function makeDomFixture({
     clientWidth: viewportWidth,
     scrollHeight: viewportHeight,
     clientHeight: viewportHeight,
-    getAttribute: (name) => name === "data-dream-skin" ? "active" : null,
+    getAttribute: (name) => {
+      if (name === "data-dream-skin") return "active";
+      if (name === "data-dream-shell") return shellAppearance;
+      return null;
+    },
   };
   const document = {
     documentElement,
@@ -101,6 +110,7 @@ function makeDomFixture({
       if (selector === selectors.shell) return shellCandidates[0] ?? null;
       if (selector === selectors.sidebar) return sidebarCandidates[0] ?? null;
       if (selector === selectors.composer) return composerCandidates[0] ?? null;
+      if (selector === environmentSelector) return environmentCandidates[0] ?? null;
       if (selector === selectors.settings || selector === selectors.themePreview) return settings;
       if (selector === selectors.home) return homeCandidates[0] ?? null;
       if (selector === selectors.homeIcon) return homeIconCandidates[0] ?? null;
@@ -112,6 +122,7 @@ function makeDomFixture({
       if (selector === selectors.shell) return shellCandidates;
       if (selector === selectors.sidebar) return sidebarCandidates;
       if (selector === selectors.composer) return composerCandidates;
+      if (selector === environmentSelector) return environmentCandidates;
       if (selector === selectors.home) return homeCandidates;
       if (selector === selectors.homeIcon) return homeIconCandidates;
       if (selector === selectors.gameSource) return gameSourceCandidates;
@@ -138,7 +149,9 @@ function makeDomFixture({
     window,
     innerWidth: viewportWidth,
     innerHeight: viewportHeight,
-    getComputedStyle: (node) => node?._style ?? {},
+    getComputedStyle: (node, pseudo) => pseudo === "::before"
+      ? node?._beforeStyle ?? {}
+      : node?._style ?? {},
   };
 }
 
@@ -186,6 +199,53 @@ test("visible L1 renderer passes exact macOS verification", async () => {
   assert.equal(result.shell.visible, true);
   assert.equal(result.sidebar.visible, true);
   assert.equal(result.composer.visible, true);
+});
+
+test("Light Internet Angel accepts its adaptive Environment surface", async () => {
+  const toggle = makeElement();
+  const action = makeElement();
+  const environment = makeElement({
+    rect: makeRect(300, 420, 960, 60),
+    style: {
+      backgroundColor: "rgb(241, 240, 242)",
+      backgroundImage: "none",
+      borderWidth: "1px",
+    },
+    beforeStyle: { backgroundImage: "linear-gradient(rgb(99, 244, 255), rgb(255, 69, 200))" },
+    attributes: { "data-angel-component": "environment" },
+    querySelector: (selector) => selector === 'button[class~="group/section-toggle"]' ? toggle : null,
+    querySelectorAll: (selector) => selector === "button" ? [toggle, action] : [],
+  });
+  const result = await verify({
+    expectedThemeId: "preset-internet-angel",
+    dom: makeDomFixture({
+      environmentCandidates: [environment],
+      shellAppearance: "light",
+      themeId: "preset-internet-angel",
+    }),
+  });
+  assert.equal(result.angelCoverage.environment, true);
+  assert.equal(result.pass, true);
+
+  const darkResult = await verify({
+    expectedThemeId: "preset-internet-angel",
+    dom: makeDomFixture({
+      environmentCandidates: [environment],
+      themeId: "preset-internet-angel",
+    }),
+  });
+  assert.equal(darkResult.angelCoverage.environment, false);
+
+  environment._beforeStyle.backgroundImage = "none";
+  const unaccentedResult = await verify({
+    expectedThemeId: "preset-internet-angel",
+    dom: makeDomFixture({
+      environmentCandidates: [environment],
+      shellAppearance: "light",
+      themeId: "preset-internet-angel",
+    }),
+  });
+  assert.equal(unaccentedResult.angelCoverage.environment, false);
 });
 
 test("CSS-hidden, detached, and offscreen anchors cannot satisfy L1", async () => {

@@ -1,6 +1,298 @@
 # Task Progress
 
-Updated: 2026-08-09 CST (Asia/Shanghai)
+Updated: 2026-08-13 CST (Asia/Shanghai)
+
+## macOS and Windows style parity
+
+- [live application corrected] A one-shot worktree injection was being
+  overwritten by the installed `1.5.12` watcher. Its recorded PID, path, port
+  and start time were validated before replacement. The active persistent
+  watcher now runs this worktree's `macos/scripts/injector.mjs` at version
+  `1.5.14`; exact verification passes at revision
+  `8d161a701a54d543ef1e` without changing the persistent theme or Codex config.
+- [local implementation complete; final review passed] The post-review shared
+  sources restore adaptive text for transparent Light assistant `blockquote`
+  and inline `code` / `kbd`, while keeping opaque code, table and detail surfaces
+  on their fixed-dark foreground. Renderer fallback Composer discovery now
+  excludes structure-detected left navigation. Diff `attachShadow` hooks carry
+  active/original metadata so cleanup invalidates retained hooks and a later
+  injection can unwrap them. Each fix has a focused red/green regression, and
+  generated assets were resynchronized on 2026-08-12. The final screenshot
+  review also found task-header status chrome overlapping a narrow native
+  source-workspace tab. A single macOS runtime base-CSS guard now suppresses
+  only that `::after` decoration while a classified side workspace is mounted; the
+  normal task header and floating Environment panel keep the status chrome.
+- [current verified checkpoint] Shared extension and Renderer tests, macOS
+  overlay/Renderer/verifier tests, Windows Renderer tests, selector doctor,
+  runtime sync, relevant JavaScript and macOS shell syntax, all three platform
+  payload checks, both macOS Internet Angel presets, macOS payload-template
+  `7/7`, Windows payload-template `6/6`, and `git diff --check` pass. The complete
+  applicable macOS suite also passes with Swift build, XCTest `10/10`, Safe CSS
+  `12/12`, ZIP/import, transaction, signed-runtime, configuration and runtime
+  state checks; Doctor was explicitly skipped.
+- [visual evidence correction] The earlier Light/Dark workspace screenshots
+  opened `Day6.lua` from an unrelated AnimalGit checkout. That file was not
+  modified, but those screenshots are discarded as acceptance evidence for
+  this repository. The exact verifier and overflow results remain valid for
+  the renderer payload; Light/Dark workspace visual acceptance must be rerun
+  with a file from this repository after the queued Codex file panel mounts.
+- [live state restored] Persistent `appearance=auto` was reapplied as revision
+  `8d161a701a54d543ef1e`, follows the native Dark shell, and passes the exact
+  verifier. Persistent theme/config hashes remain
+  `0ba8d94c7974b01aa3b05886e65afc3323591996f2db7f2d759236019797c430` and
+  `b341d7f65ccbb7cc2d52321e6d825ac0e9f5d70370d9feb4559dda0f5ad10dfb`.
+  The previous workspace screenshots are not acceptance evidence because they
+  showed a file from another repository. A clean current-repository Auto,
+  Light and Dark workspace capture remains pending.
+- [final code review] Fresh code and automated-contract review found no
+  remaining actionable P0/P1/P2 issue. The complete
+  macOS suite and the portable Windows Node/payload gates were rerun on the
+  final worktree; Windows PowerShell and real Windows visuals remain the only
+  platform-specific gaps below. Current-repository macOS workspace screenshots
+  remain a separate visual-evidence gap after discarding the cross-project
+  captures.
+- [remaining platform gates] This macOS host has neither Windows PowerShell nor
+  `pwsh`. Real Windows Dark/Light computed-style and screenshot comparison plus
+  the complete `run-tests.ps1` suite remain CI or physical-Windows gates; the
+  portable checks above are not a complete Windows platform sign-off.
+
+- [goal] Restore the first complete style-parity direction: macOS must consume
+  the same Internet Angel component styling as Windows in Dark and Light mode,
+  including composers, Projects/PR routes, recognized right workspaces,
+  dialogs/menus, diff/source surfaces, and interaction states.
+- [scope clarification] The user confirmed on 2026-08-11 that Windows is the
+  visual and behavioral reference and macOS is the only parity target. Linux
+  generated extension copies may continue to follow the existing sync tool,
+  but Linux renderer behavior and live visual validation are not acceptance
+  gates for this task.
+- [historical review finding, resolved] Shared-extension sync alone was not
+  sufficient proof of final parity because Windows keeps an independent base
+  CSS and renderer. At that point the macOS renderer misclassified a
+  Footer-owned input, excluded a right-aside composer when no left sidebar was
+  mounted, and lacked the Windows generic-composer and Diff Shadow behavior.
+- [complete] Added red regressions for the two Composer cases, macOS first-frame
+  Composer styling, and late Diff Shadow attachment. The minimal runtime fixes
+  now reject Footer owners, preserve right-aside composers without a mounted
+  left sidebar, copy the Windows generic Composer surface semantics into the
+  macOS base source, and use a bounded per-host root-only Diff retry rather than
+  repeated full-document classification.
+- [historical verified] Focused shared extension, shared renderer, macOS Internet Angel,
+  macOS renderer, Windows renderer, runtime sync and JavaScript syntax checks
+  pass after regenerating platform assets. The complete macOS suite also passes
+  with Swift build and XCTest 10/10; macOS, Windows and Linux payload checks,
+  both macOS Internet Angel preset payloads, payload template contracts and
+  `git diff --check` pass. At that checkpoint Doctor was explicitly skipped and
+  no current-revision live visual smoke had yet been claimed.
+- [workspace] Primary worktree on branch
+  `codex/macos-windows-style-parity`, created from clean `main`. Draft PR
+  preparation was authorized on 2026-08-13. No version bump, tag, merge or
+  Release action is included in this branch.
+- [scope] Put cross-platform CSS, component bridges, and lifecycle behavior in
+  `runtime/internet-angel-extension.{css,js}` and generate all platform copies.
+  Keep the current safe multi-composer discovery in `runtime/renderer-inject.js`.
+  Keep macOS first-frame/base contracts that correspond to the independent
+  Windows base CSS in `runtime/dream-skin.css`, then generate the macOS asset.
+- [reference] The original complete parity implementation remains recoverable
+  as `stash@{0}` (`83b4fe5`, 2026-08-10 14:37 CST). It was used as the factual
+  first-version reference instead of reconstructing the scope from memory.
+- [excluded] Divider-drag color stability remains a separate bug. The shared
+  side workspace therefore retains the first version's full-surface `155deg`
+  gradient; no fixed base color or drag-specific assertion remains in this
+  patch. Also excluded: the later Windows `themeDiffsContainers()` adaptive
+  token proposal, forced Dark appearance, preset/manifest migration, Windows
+  Acrylic or Win32 work, installer, version, and Release work.
+- [safety] Do not restore the earlier broad global `aside` paint, recursive
+  file-diff background clearing, terminal-panel fallback/reject arrays, or
+  full-root attribute observation. The Windows `rounded-2xl` Composer cleanup
+  is retained only inside an identified Composer root. Theme classified public
+  parts and explicit wrappers; observe only the shared `data-ds-part` bridge
+  and owned Diff Shadow roots.
+- [superseded] The previous reduced macOS-only direction and its statement that
+  Light/Shadow DOM work was excluded are superseded by the user's request to
+  restore complete style synchronization.
+- [historical review finding, resolved] The first renderer pass intended to
+  collect each editable-input-owned composer, including a second
+  `ComposerLayoutRoot` in a non-left aside. Review found its Footer rejection
+  and no-left-sidebar case incorrect; both now have focused regressions and use
+  the existing `data-ds-part="composer"` bridge.
+- [complete] Reconstructed the complete shared parity patch from the retained
+  Windows behavior and the first implementation's tested contracts. The shared
+  CSS now covers adaptive Dark/Light surfaces, Projects/PR frames, recognized
+  right workspaces, dialogs, menus, composer internals, semantic message
+  wrappers, and source/diff hosts without broad `aside`, recursive diff, or
+  radius-utility selectors.
+- [complete] The shared extension consumes renderer-owned `data-ds-part`
+  composer/sidebar markers, observes only that public attribute, installs the
+  Internet Angel source-viewer style into present or bounded-late Shadow DOM
+  roots, and removes detached or theme-owned styles during reconciliation and
+  cleanup. The temporary macOS-only parity CSS was removed; generated assets
+  now come from the shared runtime sources.
+- [complete] Ported the Windows menu accent strip, separator and shortcut-label
+  styling, plus the Projects/PR sticky-header `::after` fade, into the shared
+  Internet Angel extension.
+- [complete] Diff Shadow Root checks now exhaust after 12 per-host attempts.
+  Cleanup discards timers and retry state, while `whenDefined()` routes through
+  the current registry entry instead of retaining a cleaned extension state.
+- [historical verified] Focused extension, shared/macOS/Windows renderer, macOS parity,
+  runtime sync, JavaScript syntax and diff checks pass on the final code. The
+  complete macOS suite also passes after the bounded Diff lifecycle fix,
+  including Swift build, XCTest 10/10, signed-runtime switching and runtime-state
+  integration; Doctor remains explicitly skipped.
+- [historical verified] Focused red/green coverage passes for the shared extension, macOS
+  parity fixture, shared renderer, macOS renderer, Windows renderer, and runtime
+  asset synchronization. macOS, Windows, and Linux payload checks pass, as do
+  JavaScript syntax and `git diff --check`; all three generated extension CSS/JS
+  pairs are byte-identical to their shared runtime sources. Both macOS Internet
+  Angel presets also pass explicit payload construction with the extension on.
+- [historical verified] The complete applicable macOS suite passes with its built-in live
+  Doctor skip: shell and Node syntax, Swift build, 10/10 XCTest, payload,
+  renderer, Safe CSS, ZIP/import, transaction, signed-runtime, configuration,
+  and runtime-state integration checks all passed.
+- [superseded by live smoke] A separate direct Doctor run verified the installed ChatGPT
+  signature, bundled Node, theme payload, loopback CDP ownership, visible shell,
+  composer, and Internet Angel surfaces. It returned 2 only because the running
+  renderer still reports old revision `3262374af0c9a64cc572` rather than the
+  current worktree payload; no restart or live-code installation was made, so
+  no fresh visual smoke is claimed.
+- [test gap] PowerShell is unavailable on this macOS host, so the Windows
+  PowerShell suite remains for CI or a Windows machine. The relevant Windows
+  Node renderer test and Windows payload check passed locally.
+- [reviewed] Independent final review found one Light-mode contrast defect:
+  Radix containers used an adaptive light surface while idle menu items retained
+  the fixed Angel paper foreground. A scoped red/green fix now adapts only idle
+  items on those light surfaces, excludes fixed-dark `settings-menu` descendants,
+  and leaves hover/focus/selected states white. Re-review found no remaining
+  Critical or Important issue.
+- [superseded by review] The requested uncommitted restoration was ready for inspection, but
+  the clarified Windows-to-macOS parity gate found unresolved differences. No
+  commit, push, PR, version, or Release action is planned unless separately
+  requested.
+- [complete] Added `docs/macos-windows-style-parity-review.md` as the user-facing
+  evaluation record. It separates shared sources from generated copies, maps
+  each change to its rationale, records retained safety hardening, lists the
+  exact exclusions, and documents verification evidence and remaining gaps.
+- [reviewed] Final parity review found one remaining Dark Tooltip gap: the
+  Windows base covered role, Radix-content, and slot-content portals, while the
+  macOS Dark path covered only `[role="tooltip"]`. A focused red test now checks
+  the actual macOS base payload rather than broadening the shared extension.
+- [complete] Ported the Windows first-frame Tooltip surface and SVG arrow rules
+  to `runtime/dream-skin.css`, mapping `--dream-text` and
+  `--dream-surface-raised` to `--ds-text` and `--ds-panel-2`. The existing
+  shared `[role="tooltip"]` override remains unchanged, so Windows cascade
+  behavior is preserved while role-less Radix/slot portals are themed on macOS.
+- [historical verified] After the Tooltip fix, the macOS parity test, runtime sync, shared
+  extension and renderer tests, macOS and Windows renderer tests, all three
+  platform payload checks, both macOS Internet Angel preset payloads, and
+  `git diff --check` pass. The complete macOS suite also passes with Swift
+  build, XCTest 10/10, signed-runtime switching and runtime-state integration;
+  Doctor remains explicitly skipped and no current-revision visual smoke is
+  claimed.
+- [superseded by live smoke] Final independent re-review found no remaining P0/P1/P2 parity
+  issue. Both platform injectors append the same generated extension after
+  their base CSS, so the later role-tooltip override is identical on Windows
+  and macOS; the new macOS base rules close only the previously missing Dark
+  role-less Radix/slot path. Remaining gates are current-revision macOS visual
+  smoke, real Windows visual comparison and PowerShell tests, plus optional
+  computed-style/screenshot coverage beyond selector fixtures.
+- [complete] The user authorized and completed a current-revision macOS Dark/Light live
+  visual smoke on 2026-08-11, including a Codex restart if it proves necessary.
+  Prefer applying the current worktree payload through the existing trusted
+  loopback CDP session, capture revision and visual/computed-style evidence,
+  then restore the user's original appearance and runtime state.
+- [live finding, fixed locally] The first forced-Light smoke exposed unreadable
+  assistant prose. Live computed-style and DOM probes showed the Light palette
+  itself was correct (`--angel-adaptive-text` was dark), but current Codex
+  assistant units no longer end their content-search key with `:assistant`.
+  Their semantic `data-markdown-text-style="assistant-message"` nodes therefore
+  retained the native `electron-dark` white foreground over the Light task
+  artwork. The shared extension now marks that existing semantic node and uses
+  it as a bounded mutation hint; focused initial and late-mount regressions pass.
+- [live verifier finding, fixed locally] The Light Environment panel correctly
+  matched the shared adaptive Light rule (opaque raised surface, 1 px border,
+  no full-surface gradient), while the macOS verifier still required the Dark
+  2 px gradient contract. Verification now uses the component's Angel
+  `::before` accent strip as common theme evidence, accepts the existing Light
+  adaptive surface, and retains the Dark gradient requirement. Focused macOS
+  overlay and renderer-verification tests plus syntax and diff checks pass.
+- [live finding, fixed locally] Light activity headers inherited Codex's
+  dark-shell `--color-token-conversation-body`, whose winning `!important`
+  utility made nested status text white on the adaptive Light surface. The
+  shared Light CSS now remaps only that token on `activity-header` to
+  `--angel-adaptive-text`; fixed-dark activity detail/output and the intentional
+  white hover foreground are unchanged. The pre-change Windows System Light
+  copy followed the same shared path and lacked this guard; its generated copy
+  now includes the fix. This proves the shared trigger shape and protection,
+  not that the visible defect was reproduced on a potentially different
+  Windows Codex bundle.
+- [superseded by final live smoke] Light revision `5bfa831e05753b7e2cab` and Dark revision
+  `ac2d278790daaaf5c12f` both pass the current macOS verifier on a visible task
+  route with no document overflow. Light visible activity text computes to
+  `#201e24`; Dark retains its light activity foreground. Light Environment uses
+  its expected 1 px adaptive surface and Dark retains the 2 px gradient.
+- [historical verified] After the activity-token fix, focused shared/macOS/Windows renderer
+  checks, runtime sync, all three payload checks, JavaScript/shell syntax,
+  `git diff --check`, and the complete applicable macOS suite pass again. The
+  suite includes Swift build, XCTest 10/10, Safe CSS, ZIP/import, signed-runtime,
+  configuration and runtime-state integration; Doctor was explicitly skipped.
+- [superseded by final live smoke] The persistent theme remained `appearance=auto` and
+  was reapplied successfully as Auto revision `341e687c69f30cf20484`, following
+  the user's native Dark setting. The pre-task live revision
+  `3262374af0c9a64cc572` had no retained payload snapshot and its old watcher is
+  no longer running, so the original payload/revision cannot be claimed as
+  restored.
+- [remaining gate] Real Windows Light/Dark visual evidence and the PowerShell
+  suite remain unavailable on this macOS host. The macOS screenshots cover a
+  representative task route and visible Environment, not an exhaustive manual
+  pass through every Projects/PR, dialog, tooltip, second-composer or Diff view.
+- [superseded by final live smoke] Markdown validation for this file and the parity review, plus
+  `git diff --check`, pass. The persisted theme still declares
+  `appearance=auto`; Codex and the injector were no longer running at the final
+  read-only status check, so the last successful Auto revision above was not
+  live-probed again.
+- [complete] The user requested an explicit Windows regression assurance pass.
+  The macOS-compatible Windows/shared Node subset, payload variants,
+  generated-asset sync, syntax checks and independent Windows diff review have
+  completed. PowerShell and real Windows visual execution remain explicit
+  platform-only gates.
+- [review finding, resolved locally] The Windows-focused diff review found
+  three System Light cascade regressions in the appended shared extension:
+  adaptive Radix paint could overwrite the fixed-dark Settings menu surface,
+  the generic Light input rule could overwrite fixed-dark Settings inputs, and
+  the late fixed-dark descendant fallback could replace the selected
+  side-workspace cyan state with paper white. A narrower follow-up also caught
+  the Settings placeholder, wrapper-marked Settings search input, and
+  selected-tab descendant variants before final verification.
+- [complete] Added focused red contracts, then limited the shared CSS fix to
+  excluding classified Settings inputs/placeholders and menus from generic
+  Light paint, keeping the Settings search input transparent with a readable
+  muted placeholder, and restoring selected side-workspace cyan on both the
+  selected node and the same bounded text descendants used by the fixed-dark
+  fallback. No Windows base, Renderer, injector, PowerShell, Acrylic, Win32 or
+  installer source changed.
+- [verified] The focused extension contract is green after regenerating
+  all platform copies. All 17 Windows JavaScript/module syntax checks, runtime
+  sync, selector doctor, shared renderer, Safe CSS 12/12, nine portable Windows
+  Node regressions, payload-template integrity 6/6, injector self-test, and
+  System/Acrylic/explicit-theme payload construction pass. The one-shot test
+  initially hit sandbox loopback `EPERM` and passed unchanged with local
+  loopback permission; invalid `blur` material remains rejected. Targeted
+  macOS extension, renderer, verifier, payload-template and both Internet Angel
+  preset payload checks also pass. The complete applicable macOS suite passes
+  after the shared CSS fix, including Swift build, XCTest 10/10, Safe CSS,
+  ZIP/import, transaction, signed-runtime, configuration and runtime-state
+  integration; Doctor was explicitly skipped. Its first attempt failed only
+  because the sandbox denied Swift's user cache, and the unchanged command
+  passed with cache permission.
+- [final Windows review] The post-fix read-only review found no remaining
+  actionable Dark, Light or Acrylic regression in the changed Windows path.
+  It specifically rechecked the Settings search wrapper/child cascade,
+  self-marked Settings inputs and placeholders, Settings menu surface and idle
+  items, and side-workspace selected parent/descendant restoration.
+- [remaining Windows gate] This macOS host still has neither Windows PowerShell
+  nor `pwsh`; PowerShell 5.1/7 behavior, Win32/Acrylic runtime effects and real
+  Windows Dark/Light computed-style or screenshot validation remain CI or
+  physical Windows gates. Do not claim complete Windows platform validation
+  from the portable checks above.
 
 ## v1.5.14 upstream sync and release
 
