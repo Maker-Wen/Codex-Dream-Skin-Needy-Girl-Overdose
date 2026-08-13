@@ -10,6 +10,8 @@ const composerSelector = ':is(.composer-surface-chrome, [data-composer-surface-v
 const composerToolbarSelector = ':is(.composer-surface-chrome [class*="_footer_"], [data-composer-surface-variant] [data-composer-footer-responsive])';
 const composerEditorSelector = `${composerSelector} .ProseMirror[contenteditable="true"], ` +
   `${composerSelector} [contenteditable="true"]`;
+const genericComposerOwnerSelector = '[data-testid*="composer" i], [data-testid*="prompt" i], ' +
+  '[class*="composer" i], [class*="prompt" i]';
 
 function styleDeclaration() {
   const values = new Map();
@@ -38,6 +40,9 @@ function classList(initial) {
 function makeFixture({
   nativeAppearance = "dark", settings = false, settingsPanel = false, adopted = true,
   generic = false, genericComposer = true, genericHome = false, genericSearch = false,
+  genericCanonicalComposer = false, genericFooterComposer = false,
+  genericNestedComposer = false, genericSecondaryComposer = false, genericSidebar = true,
+  genericStableSidebar = true,
   modernMessages = false, modernComposerEditor = false,
 } = {}) {
   const attrs = new Map();
@@ -105,6 +110,7 @@ function makeFixture({
         return results;
       },
       matches(selector) { return selectorMatches.has(selector); },
+      removeSelectorMatch(selector) { selectorMatches.delete(selector); },
       closest(selector) {
         let current = node;
         while (current) {
@@ -139,24 +145,107 @@ function makeFixture({
     const mainSelector = 'main, [role="main"]';
     const inputSelector = 'textarea, [contenteditable="true"], [role="textbox"]';
     const sidebarSelector = 'aside, nav[aria-label]';
-    const composerSelector = '[data-testid*="composer" i], [data-testid*="prompt" i], ' +
-      '[class*="composer" i], [class*="prompt" i]';
+    const composerRootSelector = '[class*="ComposerLayoutRoot" i]';
+    const composerRejectSelector = [
+      '[data-composer-footer-responsive]',
+      '[class*="ComposerLayoutFooter" i]',
+      '[class*="ComposerLayoutToolbar" i]',
+      '[class*="ComposerLayoutEditor" i]',
+      '[class*="composer-footer" i]',
+      '[class*="composer-toolbar" i]',
+      '[class*="composer-editor" i]',
+    ].join(", ");
     const overlaySelector = '[role="dialog"], [aria-modal="true"]';
     partFixtures.shell = makeDomNode("generic-shell", body);
-    partFixtures.sidebar = makeDomNode("generic-sidebar", partFixtures.shell, new Map(), [sidebarSelector]);
+    if (genericSidebar) {
+      const sidebarParent = genericStableSidebar ? partFixtures.shell :
+        makeDomNode("generic-sidebar-aside", partFixtures.shell, new Map(), ["aside"]);
+      partFixtures.sidebar = makeDomNode(
+        "generic-sidebar",
+        sidebarParent,
+        new Map([["aria-label", "Primary navigation"]]),
+        [sidebarSelector, 'nav[aria-label]', ...(genericStableSidebar ? ["aside"] : [])],
+      );
+    }
     partFixtures.main = makeDomNode("generic-main", partFixtures.shell, new Map(), [mainSelector]);
     if (genericComposer) {
       partFixtures.composer = makeDomNode(
-        "generic-composer", partFixtures.main, new Map(), [composerSelector],
+        "generic-composer", partFixtures.main, new Map(), [genericComposerOwnerSelector],
       );
       partFixtures.input = makeDomNode("generic-input", partFixtures.composer, new Map(), [inputSelector]);
+    }
+    if (genericCanonicalComposer) {
+      partFixtures.canonicalComposer = makeDomNode(
+        "canonical-composer", partFixtures.main, new Map(), [composerSelector],
+      );
+      partFixtures.canonicalInput = makeDomNode(
+        "canonical-input", partFixtures.canonicalComposer, new Map(), [inputSelector],
+      );
+    }
+    if (genericFooterComposer) {
+      partFixtures.footerComposer = makeDomNode(
+        "generic-footer-composer",
+        partFixtures.main,
+        new Map(),
+        [genericComposerOwnerSelector, composerRejectSelector],
+      );
+      partFixtures.footerInput = makeDomNode(
+        "generic-footer-input", partFixtures.footerComposer, new Map(), [inputSelector],
+      );
+    }
+    if (genericNestedComposer) {
+      partFixtures.nestedComposer = makeDomNode(
+        "generic-nested-composer", partFixtures.main, new Map(), [genericComposerOwnerSelector],
+      );
+      partFixtures.nestedFooter = makeDomNode(
+        "generic-nested-footer", partFixtures.nestedComposer, new Map(),
+        [genericComposerOwnerSelector, composerRejectSelector],
+      );
+      partFixtures.nestedToolbar = makeDomNode(
+        "generic-nested-toolbar", partFixtures.nestedFooter, new Map(),
+        [genericComposerOwnerSelector, composerRejectSelector],
+      );
+      partFixtures.nestedEditor = makeDomNode(
+        "generic-nested-editor", partFixtures.nestedToolbar, new Map(),
+        [genericComposerOwnerSelector, composerRejectSelector],
+      );
+      partFixtures.nestedInput = makeDomNode(
+        "generic-nested-input", partFixtures.nestedEditor, new Map(), [inputSelector],
+      );
+    }
+    if (genericSecondaryComposer) {
+      partFixtures.sideAside = makeDomNode("generic-side-aside", partFixtures.shell, new Map(), ["aside"]);
+      partFixtures.sideComposer = makeDomNode(
+        "generic-side-composer", partFixtures.sideAside, new Map(), [composerRootSelector],
+      );
+      partFixtures.sideComposerFooter = makeDomNode(
+        "generic-side-composer-footer", partFixtures.sideComposer, new Map(),
+        [genericComposerOwnerSelector],
+      );
+      partFixtures.sideInput = makeDomNode(
+        "generic-side-input", partFixtures.sideComposerFooter, new Map(), [inputSelector],
+      );
+      partFixtures.emptyComposerRoot = makeDomNode(
+        "generic-empty-composer", partFixtures.sideAside, new Map(), [composerRootSelector],
+      );
+      if (partFixtures.sidebar) {
+        partFixtures.sidebarComposer = makeDomNode(
+          "generic-sidebar-composer", partFixtures.sidebar, new Map(), [composerRootSelector],
+        );
+        partFixtures.sidebarInput = makeDomNode(
+          "generic-sidebar-input", partFixtures.sidebarComposer, new Map(), [inputSelector],
+        );
+      }
     }
     partFixtures.unrelatedAside = makeDomNode(
       "generic-content-aside", partFixtures.main, new Map(), [sidebarSelector],
     );
     partFixtures.dialog = makeDomNode("generic-dialog", partFixtures.main, new Map(), [overlaySelector]);
+    partFixtures.dialogComposer = makeDomNode(
+      "generic-dialog-composer", partFixtures.dialog, new Map(), [genericComposerOwnerSelector],
+    );
     partFixtures.dialogInput = makeDomNode(
-      "generic-dialog-input", partFixtures.dialog, new Map(), [inputSelector],
+      "generic-dialog-input", partFixtures.dialogComposer, new Map(), [inputSelector],
     );
     if (genericSearch) {
       partFixtures.searchForm = makeDomNode("generic-search-form", partFixtures.main, new Map(), ["form"]);
@@ -165,10 +254,23 @@ function makeFixture({
       );
     }
     register(mainSelector, partFixtures.main);
+    if (partFixtures.sidebarInput) register(inputSelector, partFixtures.sidebarInput);
     if (genericSearch) register(inputSelector, partFixtures.searchInput);
     if (genericComposer) register(inputSelector, partFixtures.input);
+    if (genericCanonicalComposer) {
+      register(composerSelector, partFixtures.canonicalComposer);
+      register(inputSelector, partFixtures.canonicalInput);
+    }
+    if (genericFooterComposer) register(inputSelector, partFixtures.footerInput);
+    if (genericNestedComposer) register(inputSelector, partFixtures.nestedInput);
+    if (genericSecondaryComposer) register(inputSelector, partFixtures.sideInput);
     register(inputSelector, partFixtures.dialogInput);
-    register(sidebarSelector, partFixtures.sidebar);
+    if (partFixtures.sidebar) {
+      register(sidebarSelector, partFixtures.sidebar);
+      register('nav[aria-label]', partFixtures.sidebar);
+      if (genericStableSidebar) register("aside.app-shell-left-panel", partFixtures.sidebar);
+    }
+    if (genericSecondaryComposer) register(sidebarSelector, partFixtures.sideAside);
     register(sidebarSelector, partFixtures.unrelatedAside);
     if (genericHome) {
       partFixtures.homeIcon = makeDomNode("generic-home-icon", partFixtures.main);
@@ -505,8 +607,63 @@ export async function runRendererRuntimeTest(assetRoot) {
     "The composer wrapper, not its input, should receive the public part when available.");
   assert.equal(generic.partFixtures.unrelatedAside.getAttribute("data-ds-part"), null,
     "An aside inside the main content must not be exposed as the app sidebar.");
+  assert.equal(generic.partFixtures.dialogComposer.getAttribute("data-ds-part"), null,
+    "A composer-like owner inside a dialog must not receive the public composer part.");
   assert.equal(generic.partFixtures.dialogInput.getAttribute("data-ds-part"), null,
     "Dialog inputs must not be mistaken for the app composer.");
+
+  const genericNested = makeFixture({
+    nativeAppearance: "dark", generic: true, genericComposer: false, genericNestedComposer: true,
+  });
+  vm.runInNewContext(genericNested.payloadFor(), genericNested.context);
+  assert.equal(genericNested.partFixtures.nestedComposer.getAttribute("data-ds-part"), "composer",
+    "Nested Footer/Toolbar/Editor wrappers must not hide their outer composer owner.");
+  for (const key of ["nestedFooter", "nestedToolbar", "nestedEditor"]) {
+    assert.equal(genericNested.partFixtures[key].getAttribute("data-ds-part"), null,
+      `${key} must not receive the composer part.`);
+  }
+
+  const genericMultiple = makeFixture({
+    nativeAppearance: "dark", generic: true, genericCanonicalComposer: true,
+    genericComposer: false, genericSecondaryComposer: true,
+  });
+  vm.runInNewContext(genericMultiple.payloadFor(), genericMultiple.context);
+  assert.equal(genericMultiple.partFixtures.canonicalComposer.getAttribute("data-ds-part"), "composer",
+    "The canonical composer must remain marked when a fallback composer coexists.");
+  assert.equal(genericMultiple.partFixtures.sideComposer.getAttribute("data-ds-part"), "composer",
+    "A secondary fallback composer must remain discoverable beside the canonical composer.");
+  assert.equal(genericMultiple.partFixtures.sideComposerFooter.getAttribute("data-ds-part"), null,
+    "The composer footer must not be marked as the composer root.");
+  assert.equal(genericMultiple.partFixtures.emptyComposerRoot.getAttribute("data-ds-part"), null,
+    "A ComposerLayoutRoot without an editable input must remain unmarked.");
+  assert.equal(genericMultiple.partFixtures.sidebarComposer.getAttribute("data-ds-part"), null,
+    "A composer-like input in the fallback left sidebar must remain unmarked.");
+
+  const genericFallbackSidebar = makeFixture({
+    nativeAppearance: "dark", generic: true, genericComposer: false,
+    genericSecondaryComposer: true, genericStableSidebar: false,
+  });
+  vm.runInNewContext(genericFallbackSidebar.payloadFor(), genericFallbackSidebar.context);
+  assert.equal(genericFallbackSidebar.partFixtures.sidebar.getAttribute("data-ds-part"), "sidebar",
+    "A nav sibling of main must remain discoverable as the fallback left sidebar.");
+  assert.equal(genericFallbackSidebar.partFixtures.sidebarComposer.getAttribute("data-ds-part"), null,
+    "A ComposerLayoutRoot inside a fallback-only left sidebar must remain unmarked.");
+
+  const genericFooter = makeFixture({
+    nativeAppearance: "dark", generic: true, genericComposer: false, genericFooterComposer: true,
+  });
+  vm.runInNewContext(genericFooter.payloadFor(), genericFooter.context);
+  assert.equal(genericFooter.partFixtures.footerComposer.getAttribute("data-ds-part"), null,
+    "A ComposerLayoutFooter without a ComposerLayoutRoot must not become the composer owner.");
+
+  const genericWithoutSidebar = makeFixture({
+    nativeAppearance: "dark", generic: true, genericSecondaryComposer: true, genericSidebar: false,
+  });
+  vm.runInNewContext(genericWithoutSidebar.payloadFor(), genericWithoutSidebar.context);
+  assert.equal(genericWithoutSidebar.partFixtures.sideAside.getAttribute("data-ds-part"), null,
+    "A right-side aside must not become the fallback app sidebar.");
+  assert.equal(genericWithoutSidebar.partFixtures.sideComposer.getAttribute("data-ds-part"), "composer",
+    "A right-side ComposerLayoutRoot must remain a composer while the left sidebar is unmounted.");
 
   const genericSearch = makeFixture({
     nativeAppearance: "dark", generic: true, genericComposer: false, genericSearch: true,
@@ -531,6 +688,21 @@ export async function runRendererRuntimeTest(assetRoot) {
     genericSearchBeforeComposer.partFixtures.composer.getAttribute("data-ds-part"), "composer",
     "A preceding search textbox must not hide the real semantic composer.",
   );
+
+  const genericRoleChange = makeFixture({ nativeAppearance: "dark", generic: true });
+  vm.runInNewContext(genericRoleChange.payloadFor(), genericRoleChange.context);
+  const roleChangeComposer = genericRoleChange.partFixtures.composer;
+  assert.equal(roleChangeComposer.getAttribute("data-ds-part"), "composer");
+  roleChangeComposer.removeSelectorMatch(genericComposerOwnerSelector);
+  const roleChangeObserver = genericRoleChange.observers.find(
+    (observer) => observer.options?.childList,
+  );
+  roleChangeObserver.callback([{ type: "childList" }]);
+  genericRoleChange.flushTimers(80);
+  assert.equal(roleChangeComposer.parentElement, genericRoleChange.partFixtures.main,
+    "The stale-role regression must exercise a node that remains connected.");
+  assert.equal(roleChangeComposer.getAttribute("data-ds-part"), null,
+    "Refreshing a connected node after its role changes must remove the stale public part.");
 
   const genericHome = makeFixture({ nativeAppearance: "dark", generic: true, genericHome: true });
   vm.runInNewContext(genericHome.payloadFor(), genericHome.context);

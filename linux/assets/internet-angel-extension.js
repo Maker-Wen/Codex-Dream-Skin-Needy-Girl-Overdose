@@ -4,7 +4,7 @@
   const componentAttribute = "data-angel-component";
   const selectors = {
     shell: 'main:is(.main-surface, [data-app-shell-main-surface], [class*="_MainContentSurface_"])',
-    composer: ':is(.composer-surface-chrome, [data-composer-surface-variant])',
+    composer: ':is(.composer-surface-chrome, [data-composer-surface-variant], [data-ds-part="composer"])',
     composerFooter: ':is([class*="_footer_"], [data-composer-footer-responsive])',
     stickyComposer: 'main:is(.main-surface, [data-app-shell-main-surface], [class*="_MainContentSurface_"]) [class~="sticky"][class~="bottom-0"]',
     contextStrip: 'div[class~="relative"][class~="min-w-0"][class~="overflow-clip"][class~="border-x"][class~="border-t"]',
@@ -13,11 +13,12 @@
     environmentGit: '[data-testid*="git"], [aria-label*="git" i], [class*="git-"]',
     workspace: '[class*="contain:layout_paint"], [class~="bg-token-main-surface-primary"]',
     workspaceEvidence: '[role="tablist"], [role="tabpanel"], .xterm, .thread-scroll-container',
-    sidebar: 'aside.app-shell-left-panel, [data-testid="app-shell-floating-left-panel"]',
+    sidebar: 'aside.app-shell-left-panel, [data-testid="app-shell-floating-left-panel"], [data-ds-part="sidebar"]',
     paletteScroll: 'div.vertical-scroll-fade-mask[class~="overflow-y-auto"]',
     paletteHeading: '[class~="sticky"][class~="top-0"][class~="z-10"]',
     paletteItem: 'button[class~="w-full"][class~="shrink-0"][class~="rounded-lg"][class~="text-left"]',
     turnRow: 'button[class*="navigation-row"]',
+    assistantMessage: '[data-markdown-text-style="assistant-message"]',
     settingsNav: 'nav:has([data-settings-panel-slug])',
     settingsContent: '[class~="scrollbar-stable"][class~="flex-1"][class~="overflow-y-auto"][class~="p-panel"]',
   };
@@ -51,6 +52,7 @@
     '[data-content-search-unit-key$=":user"]',
     '[data-content-search-unit-key$=":assistant"]',
     '[data-response-annotation-target]',
+    selectors.assistantMessage,
     '[class*="group/activity-header"]',
     '[class*="group/command"]',
     '[class*="group/output"]',
@@ -71,6 +73,7 @@
     '.thread-diff-virtualized',
     '[role="tabpanel"] > [class~="h-full"][class~="min-h-0"][class~="overflow-y-auto"][class~="px-3"][class~="py-5"]',
     '[role="tabpanel"] button[class~="items-start"][class~="w-full"]',
+    'diffs-container',
     `[${componentAttribute}]`,
   ].join(", ");
   const previous = window[registryKey];
@@ -89,10 +92,56 @@
   const listeners = [];
   let refreshTimer = null;
   let refreshFrame = null;
+  let diffRootTimer = null;
   let state = null;
   let activeMarks = null;
   let compositionDepth = 0;
   let refreshPendingAfterComposition = false;
+  const diffRootRetryLimit = 12;
+  let diffRootAttempts = new WeakMap();
+  const diffThemeAttribute = "data-internet-angel-diff-theme";
+  const attachShadowHookKey = "__CODEX_INTERNET_ANGEL_ATTACH_SHADOW_HOOK__";
+  const ownedDiffStyles = new Set();
+  const diffRootObservers = new Map();
+  let restoreAttachShadow = null;
+  const diffSurface = "color-mix(in oklab, var(--angel-adaptive-surface) 94%, var(--angel-adaptive-accent) 5%)";
+  const diffSurfaceRaised = "color-mix(in oklab, var(--angel-adaptive-surface-raised) 94%, var(--angel-adaptive-accent) 6%)";
+  const diffThemeCss = `
+:host {
+  --diffs-bg: ${diffSurface} !important;
+  --diffs-fg: var(--angel-adaptive-text) !important;
+  --diffs-bg-context: ${diffSurfaceRaised} !important;
+  color: var(--angel-adaptive-text) !important;
+  background-color: ${diffSurface} !important;
+}
+[data-file] {
+  --diffs-bg: ${diffSurface} !important;
+  --diffs-fg: var(--angel-adaptive-text) !important;
+  --codex-diffs-surface: ${diffSurface} !important;
+  --codex-diffs-context-surface: ${diffSurfaceRaised} !important;
+  --codex-diffs-header-surface: ${diffSurfaceRaised} !important;
+  --codex-diffs-separator-surface: ${diffSurfaceRaised} !important;
+  --codex-diffs-hover-surface: ${diffSurfaceRaised} !important;
+  color: var(--angel-adaptive-text) !important;
+  background-color: ${diffSurface} !important;
+  scrollbar-color: color-mix(in oklab, var(--angel-cyan) 52%, transparent) transparent;
+}
+:is(pre, code, [data-content], [data-gutter], [data-column-number], [data-gutter-buffer], [data-diffs-header], [data-file-info]) {
+  background-color: ${diffSurface} !important;
+}
+:is(pre, code, [data-content], [data-line]) { color: var(--angel-adaptive-text) !important; }
+:is([data-line] span, [data-line-number-content], [data-column-number]) {
+  color: color-mix(in oklab, var(--angel-adaptive-text) 76%, var(--angel-adaptive-accent)) !important;
+}
+[data-line] span { background-color: transparent !important; }
+[data-code]::-webkit-scrollbar { width: 10px !important; height: 10px !important; }
+[data-code]::-webkit-scrollbar-track { background: transparent !important; }
+[data-code]::-webkit-scrollbar-thumb {
+  background: color-mix(in oklab, var(--angel-cyan) 52%, transparent) !important;
+  border-radius: 6px !important;
+}
+::selection { background: color-mix(in oklab, var(--angel-pink) 38%, transparent) !important; }
+`;
   const metrics = {
     classifyRuns: 0,
     scheduleRequests: 0,
@@ -113,6 +162,98 @@
       metrics.attributeWrites += 1;
     }
     return node;
+  };
+
+  const pruneDiffStyles = () => {
+    for (const style of ownedDiffStyles) {
+      if (style.isConnected === false) {
+        style.remove?.();
+        ownedDiffStyles.delete(style);
+      }
+    }
+  };
+
+  const syncDiffRoot = (host, root) => {
+    if (!root || host?.isConnected === false || host.shadowRoot !== root) return;
+    pruneDiffStyles();
+    let style = root.querySelector?.(`style[${diffThemeAttribute}]`);
+    if (!style) {
+      style = document.createElement("style");
+      style.setAttribute(diffThemeAttribute, "");
+      root.appendChild(style);
+    }
+    if (style.textContent !== diffThemeCss) style.textContent = diffThemeCss;
+    ownedDiffStyles.add(style);
+    if (diffRootObservers.has(root) || typeof MutationObserver !== "function") return;
+    const observer = new MutationObserver(() => {
+      if (window[registryKey] === state) syncDiffRoot(host, root);
+    });
+    observer.observe(root, { childList: true });
+    diffRootObservers.set(root, { host, observer });
+  };
+
+  const syncDiffsContainers = (resetAttempts = false) => {
+    pruneDiffStyles();
+    for (const [root, entry] of diffRootObservers) {
+      if (entry.host?.isConnected !== false && entry.host.shadowRoot === root) continue;
+      entry.observer.disconnect();
+      diffRootObservers.delete(root);
+    }
+    if (typeof document.createElement !== "function") return;
+    let needsRetry = false;
+    for (const host of document.querySelectorAll("diffs-container")) {
+      if (resetAttempts) diffRootAttempts.delete(host);
+      const root = host?.shadowRoot;
+      if (!root) {
+        const attempts = diffRootAttempts.get(host) || 0;
+        if (attempts < diffRootRetryLimit) {
+          diffRootAttempts.set(host, attempts + 1);
+          needsRetry = true;
+        }
+        continue;
+      }
+      diffRootAttempts.delete(host);
+      syncDiffRoot(host, root);
+    }
+    if (needsRetry && diffRootTimer === null) {
+      diffRootTimer = setTimeout(() => {
+        diffRootTimer = null;
+        if (window[registryKey] === state) syncDiffsContainers();
+      }, 120);
+    } else if (!needsRetry && diffRootTimer !== null) {
+      clearTimeout(diffRootTimer);
+      diffRootTimer = null;
+    }
+  };
+
+  const installAttachShadowHook = () => {
+    const prototype = globalThis.Element?.prototype;
+    let original = prototype?.attachShadow;
+    if (!prototype || typeof original !== "function") return;
+    const inheritedHook = original[attachShadowHookKey];
+    if (inheritedHook?.active === false && typeof inheritedHook.original === "function") {
+      original = inheritedHook.original;
+    }
+    const hookState = { active: true, original };
+    const hooked = function (...args) {
+      const root = Reflect.apply(original, this, args);
+      if (hookState.active && window[registryKey] === state
+        && this.matches?.("diffs-container") && this.shadowRoot === root) {
+        syncDiffRoot(this, root);
+      }
+      return root;
+    };
+    hooked[attachShadowHookKey] = hookState;
+    prototype.attachShadow = hooked;
+    if (prototype.attachShadow !== hooked) {
+      hookState.active = false;
+      return;
+    }
+    restoreAttachShadow = () => {
+      hookState.active = false;
+      if (prototype.attachShadow === hooked) prototype.attachShadow = original;
+      restoreAttachShadow = null;
+    };
   };
 
   const classText = (node) => typeof node?.className === "string"
@@ -398,6 +539,9 @@
     for (const bubble of document.querySelectorAll('[data-user-message-bubble="true"]')) {
       mark(bubble, "message-user");
     }
+    for (const message of document.querySelectorAll(selectors.assistantMessage)) {
+      mark(message, "message-assistant");
+    }
     for (const unit of document.querySelectorAll('[data-content-search-unit-key$=":user"]')) {
       for (const action of unit.querySelectorAll?.(
         '[class*="flex-row-reverse"][class*="items-center"] button[aria-label]',
@@ -607,6 +751,7 @@
     try {
       classifySidebar();
       classifyComposer();
+      syncDiffsContainers();
       classifyComposerPalette();
       classifyComposerContext();
       classifyEnvironment();
@@ -698,6 +843,10 @@
 
   const refreshAfterMutation = (records) => {
     for (const record of records) {
+      if (record.type === "attributes") {
+        scheduleFrameRefresh();
+        return;
+      }
       const changedNodes = [...(record.addedNodes || []), ...(record.removedNodes || [])];
       if (!changedNodes.some(hasMutationHint)) continue;
       scheduleFrameRefresh();
@@ -708,7 +857,12 @@
   function installObservers() {
     if (!document.body || observers.length) return;
     const observer = new MutationObserver(refreshAfterMutation);
-    observer.observe(document.body, { childList: true, subtree: true });
+    observer.observe(document.body, {
+      attributes: true,
+      attributeFilter: ["data-ds-part"],
+      childList: true,
+      subtree: true,
+    });
     observers.push(observer);
   }
 
@@ -719,6 +873,10 @@
   };
 
   const cleanup = () => {
+    restoreAttachShadow?.();
+    if (diffRootTimer !== null) clearTimeout(diffRootTimer);
+    diffRootTimer = null;
+    diffRootAttempts = new WeakMap();
     if (refreshTimer !== null) clearTimeout(refreshTimer);
     refreshTimer = null;
     if (refreshFrame !== null) window.cancelAnimationFrame?.(refreshFrame);
@@ -728,14 +886,22 @@
     activeMarks = null;
     for (const observer of observers) observer.disconnect();
     observers.length = 0;
+    for (const { observer } of diffRootObservers.values()) observer.disconnect();
+    diffRootObservers.clear();
     for (const [target, type, callback] of listeners) target.removeEventListener?.(type, callback);
     listeners.length = 0;
+    for (const style of ownedDiffStyles) style.remove?.();
+    ownedDiffStyles.clear();
     clearMarks();
     if (window[registryKey] === state) delete window[registryKey];
   };
 
-  state = { cleanup, observers, refresh: classify, metrics };
+  state = { cleanup, observers, refresh: classify, syncDiffsContainers, metrics };
   window[registryKey] = state;
+  installAttachShadowHook();
+  globalThis.customElements?.whenDefined?.("diffs-container").then(() => {
+    window[registryKey]?.syncDiffsContainers?.(true);
+  });
   classify();
   installObservers();
   addListener(window.navigation, "navigate");
