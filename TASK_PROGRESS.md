@@ -4,6 +4,15 @@ Updated: 2026-08-13 CST (Asia/Shanghai)
 
 ## macOS and Windows style parity
 
+- [CI finding fixed locally] PR #26 PowerShell 5.1 and 7 reached the same
+  fail-closed quick-fix source guard after the preceding Windows regressions
+  passed. The guard still required two superseded Light CSS strings: a direct
+  edited-file button selector and the removed global `--angel-paper` remap.
+  It now requires the current fixed-dark edited-file component marker and
+  adaptive Dream text token instead. A portable Node regression locks both
+  guard markers; every `.Contains` sentinel matches its source asset, runtime
+  sync and diff checks pass. The complete PowerShell patch suite awaits the
+  rerun on Windows CI.
 - [live application corrected] A one-shot worktree injection was being
   overwritten by the installed `1.5.12` watcher. Its recorded PID, path, port
   and start time were validated before replacement. The active persistent

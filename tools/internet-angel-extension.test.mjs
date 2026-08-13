@@ -30,6 +30,10 @@ const windowsRendererScript = await fs.readFile(
   path.join(projectRoot, "windows", "assets", "renderer-inject.js"),
   "utf8",
 );
+const windowsPatchScript = await fs.readFile(
+  path.join(projectRoot, "windows", "scripts", "patch-dream-skin.ps1"),
+  "utf8",
+);
 const gitAttributes = await fs.readFile(path.join(projectRoot, ".gitattributes"), "utf8");
 
 function extractRendererCss(payload) {
@@ -797,6 +801,16 @@ assert.match(
   acrylicCss,
   /:is\(\s*\[data-composer-footer-responsive\],[^)]*\)\s*\{[^}]*background:\s*transparent\s*!important[^}]*backdrop-filter:\s*none\s*!important/s,
   "Acrylic must keep the responsive composer footer transparent and free of nested blur.",
+);
+assert.match(
+  windowsPatchScript,
+  /extensionCssText\.Contains\('--angel-adaptive-text: var\(--dream-text, var\(--ds-text\)\)'\)/,
+  "The Windows quick-fix guard must accept the current adaptive Light text contract.",
+);
+assert.match(
+  windowsPatchScript,
+  /extensionCssText\.Contains\('\[data-angel-component="edited-card-files"\],'\)/,
+  "The Windows quick-fix guard must require the current fixed-dark edited-file surface contract.",
 );
 
 console.log("PASS: Internet Angel overlays and animations share one three-platform runtime.");

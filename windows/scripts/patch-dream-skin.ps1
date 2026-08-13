@@ -69,8 +69,8 @@ function Assert-DreamSkinPatchSource {
     -not $extensionCssText.Contains('.dream-theme-light') -or
     -not $extensionCssText.Contains('[data-angel-component]') -or
     -not $extensionCssText.Contains('[data-angel-component="scroll-bottom"]:is(:hover') -or
-    -not $extensionCssText.Contains('[data-angel-component="edited-card-files"] button') -or
-    -not $extensionCssText.Contains('--angel-paper: var(--dream-text)')) {
+    -not $extensionCssText.Contains('[data-angel-component="edited-card-files"],') -or
+    -not $extensionCssText.Contains('--angel-adaptive-text: var(--dream-text, var(--ds-text))')) {
     throw 'Patch source does not contain the required Codex 26.730 runtime fixes.'
   }
 }
