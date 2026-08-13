@@ -4,6 +4,11 @@ Updated: 2026-08-13 CST (Asia/Shanghai)
 
 ## macOS and Windows style parity
 
+- [ready for review] The user confirmed the currently applied theme has no
+  visible issue on 2026-08-13 and authorized opening PR #26 for formal review.
+  Static checks, Windows PowerShell 5.1, PowerShell 7 and macOS repository
+  regressions all pass at commit `1534b5c`. Real Windows Dark/Light screenshot
+  comparison remains an explicit post-PR visual gap, not a claimed validation.
 - [CI finding fixed locally] PR #26 PowerShell 5.1 and 7 reached the same
   fail-closed quick-fix source guard after the preceding Windows regressions
   passed. The guard still required two superseded Light CSS strings: a direct
