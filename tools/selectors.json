@@ -1,17 +1,18 @@
 {
   "schema": "codex-dream-skin-selectors/1",
-  "description": "双端统一选择器契约。scope 与 required 来自双端 DOM 快照实测；shell-main 与 header-tint 另由 2026-07-31 Codex 26.727.40816 真实 macOS renderer 复核。doctor / CI 应逐条 querySelector 并按 tier 判级：L1 缺失=皮肤主行为受损，L2 缺失=精修静默降级。",
+  "description": "双端统一选择器契约。scope 与 required 来自双端 DOM 快照实测；2026-08-19 已在 Codex 26.814.5167.0 Windows 真实 thread renderer 上复核 L1/L2。doctor / CI 应逐条 querySelector 并按 tier 判级：L1 缺失=皮肤主行为受损，L2 缺失=精修静默降级。",
   "verifiedAgainst": {
-    "date": "2026-08-01",
+    "date": "2026-08-19",
     "chromium": "150.0.7871.124（26.727.51351 fork 实测）；150.0.7871.182（26.727.40816 upstream 实测）",
     "codexVersionMac": "26.715.61943（历史快照）；26.727.40816（upstream 实测）；26.727.51351（fork 实测）",
-    "codexVersionWindows": "版本号未记录；bundle hash 与 mac 不同（ModelPickerTrigger mac=1fm6a win=1w4ob），确认存在版本错位",
+    "codexVersionWindows": "26.814.5167.0（真实 Windows thread renderer；L1 shell-main/left-panel/header-tint 全部命中，现代 composer、toolbar、top-fade、thread surface 与 message 均命中）",
     "fixtures": [
       "runtime/dom-fixtures/codex-dom-fixture-darwin-watch.json (15 状态)",
       "runtime/dom-fixtures/codex-dom-fixture-win32-watch.json (7 状态)",
-      "Codex 26.727.40816 signed macOS app, live app:// renderer"
+      "Codex 26.727.40816 signed macOS app, live app:// renderer",
+      "Codex 26.814.5167.0 Windows app, live selector doctor on port 9335"
     ],
-    "verdict": "双端运行时继续共用一份 selector/CSS 合同。26.727.40816 将主表面和顶栏的旧语义类改为 CSS Modules，同时提供稳定 app-shell data 属性；合同保留旧类并优先增加稳定属性。Windows 26.727 仍需真实 renderer 验收。"
+    "verdict": "双端运行时继续共用一份 selector/CSS 合同。Codex 26.814.5167.0 Windows 实测仍保留稳定 app-shell data 属性和现代 composer data 属性；现有联合选择器完整命中，不新增版本 hash 或文本选择器。"
   },
   "appearanceSignal": {
     "dark": "html.electron-dark",

@@ -1,5 +1,17 @@
 # Windows Changelog
 
+## 1.5.15 — 2026-08-19
+
+### 更新
+
+- 在当前 Windows Codex `26.814.5167.0` 真实受管会话中完成 selector doctor：全部必需 L1 选择器通过，现代 composer、toolbar、top-fade、thread surface 和消息边界继续受支持。
+- Windows、macOS 与 Linux 的运行时版本统一提升到 1.5.15；超天酱、Pixel Cafe、精确 Win32 窗口证据、自动接管和 Acrylic 扩展保持不变。
+
+### 修复
+
+- 修复 GitHub Actions Static 与 macOS jobs 对编译后 composer 联合选择器的错误正则判断；不再把有效的 `:is(...)` 选择器误判为缺失，同时仍严格要求 94% RGB 面板表面与强调色前景算法一致。
+- Windows Quick Fix 现在把现代 composer selector 与显式强调色前景算法纳入 `26.814` 源码门禁，避免旧补丁包被误报为已适配。
+
 ## 1.5.14 — 2026-08-09
 
 ### 更新

@@ -4,6 +4,9 @@ import { gradeDoctorResult, selectorMatchesScope } from "./doctor-selectors.mjs"
 
 const contract = JSON.parse(await fs.readFile(new URL("./selectors.json", import.meta.url), "utf8"));
 const selectorFor = (key) => contract.selectors.find((entry) => entry.key === key)?.selector;
+assert.match(contract.verifiedAgainst.codexVersionWindows, /26\.814\.5167\.0/,
+  "The selector contract must retain the latest live Windows verification baseline.");
+assert.match(contract.verifiedAgainst.verdict, /现有联合选择器完整命中/);
 assert.equal(
   selectorFor("shell-main"),
   "main:is(.main-surface, [data-app-shell-main-surface], [class*=\"_MainContentSurface_\"])",

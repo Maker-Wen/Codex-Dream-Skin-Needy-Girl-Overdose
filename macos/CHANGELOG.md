@@ -1,5 +1,16 @@
 # Changelog
 
+## 1.5.15 — 2026-08-19
+
+### 更新
+
+- 在 Windows Codex `26.814.5167.0` 的真实 thread renderer 上复核统一选择器合同；主表面、侧栏、顶栏、现代 composer/toolbar、top-fade、thread surface 和消息边界均继续命中。
+- Windows、macOS 与 Linux 的运行时版本统一提升到 1.5.15，并继续保留超天酱 / INTERNET ANGEL 的三端运行时和本仓库平台扩展。
+
+### 修复
+
+- 修复 GitHub Actions 在编译后的 `:is(.composer-surface-chrome, [data-composer-surface-variant])` 选择器上误报 composer 94% 面板表面合同缺失的问题；对比度算法和实际 CSS 表面保持一致。
+
 ## 1.5.14 — 2026-08-09
 
 ### 更新

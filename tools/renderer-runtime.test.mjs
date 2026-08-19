@@ -502,7 +502,7 @@ export async function runRendererRuntimeTest(assetRoot) {
   assert.match(css, /background-image:\s*var\(--ds-task-full-veil\),\s*var\(--dream-skin-art\)/);
   assert.match(
     css,
-    /(?:__DREAM_SELECTOR_COMPOSER_CHROME__|\.composer-surface-chrome)\s*\{[^}]*background:\s*rgb\(var\(--ds-panel-rgb\) \/ \.94\)/,
+    /(?:__DREAM_SELECTOR_COMPOSER_CHROME__|:is\(\.composer-surface-chrome,\s*\[data-composer-surface-variant\]\))\s*\{[^}]*background:\s*rgb\(var\(--ds-panel-rgb\) \/ \.94\)/,
     "Accent foreground contrast must model the composer panel's 94% RGB surface",
   );
   assert.match(

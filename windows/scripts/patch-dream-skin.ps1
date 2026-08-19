@@ -52,6 +52,9 @@ function Assert-DreamSkinPatchSource {
     -not $rendererText.Contains('[data-app-action-sidebar-thread-row]') -or
     -not $rendererText.Contains('SIDEBAR_SCROLL_QUIET_CLASS') -or
     -not $rendererText.Contains('appearanceFromClasses') -or
+    -not $rendererText.Contains('const readableAccentInk = (accent, panel) =>') -or
+    -not $rendererText.Contains('"--ds-on-accent"') -or
+    -not $rendererText.Contains('[data-composer-surface-variant]') -or
     -not $cssText.Contains('[data-ds-part="composer"]') -or
     -not $cssText.Contains('aside:not(.app-shell-left-panel)') -or
     -not $cssText.Contains('_MainContentFrame_') -or
@@ -71,7 +74,7 @@ function Assert-DreamSkinPatchSource {
     -not $extensionCssText.Contains('[data-angel-component="scroll-bottom"]:is(:hover') -or
     -not $extensionCssText.Contains('[data-angel-component="edited-card-files"],') -or
     -not $extensionCssText.Contains('--angel-adaptive-text: var(--dream-text, var(--ds-text))')) {
-    throw 'Patch source does not contain the required Codex 26.730 runtime fixes.'
+    throw 'Patch source does not contain the required Codex 26.814 runtime fixes.'
   }
 }
 
@@ -197,7 +200,7 @@ foreach ($pair in $patchIdentityPairs) {
   }
 }
 if ($alreadyPatched) {
-  Write-Host "The installed Dream Skin runtime at $($engine.Root) already contains the Codex 26.730 fixes."
+  Write-Host "The installed Dream Skin runtime at $($engine.Root) already contains the Codex 26.814 fixes."
   return
 }
 if ($DryRun) {
