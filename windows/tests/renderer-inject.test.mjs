@@ -2444,6 +2444,8 @@ vm.runInNewContext(buildPayload({
 }), normalizedAccent.context);
 assert.equal(normalizedAccent.rootStyles.get("--dream-accent"), "#ff45c8",
   "The Windows renderer must consume a migrated explicit accent alongside partial current colors.");
+assert.equal(normalizedAccent.rootStyles.get("--ds-on-accent"), "rgb(0 0 0)",
+  "An explicit accent must receive readable foreground ink against the composer panel.");
 
 const adaptiveAccent = createFixture({
   shellPresent: true,
@@ -2457,6 +2459,8 @@ vm.runInNewContext(buildPayload({
 }), adaptiveAccent.context);
 assert.equal(adaptiveAccent.rootStyles.get("--dream-accent"), "rgb(108 131 142)",
   "An auto theme must not mistake the normalized fallback color for an explicit accent.");
+assert.equal(adaptiveAccent.rootStyles.has("--ds-on-accent"), false,
+  "An adaptive accent must restore the stylesheet-provided foreground ink.");
 
 const headingOnlyHome = createFixture({
   shellPresent: true,

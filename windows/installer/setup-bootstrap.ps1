@@ -136,6 +136,7 @@ try {
     'scripts\manage-auto-launch-dream-skin.ps1',
     'scripts\manage-window-effects.ps1',
     'scripts\patch-dream-skin.ps1',
+    'scripts\localization-windows.ps1',
     'scripts\restore-dream-skin.ps1',
     'scripts\start-dream-skin.ps1',
     'scripts\theme-windows.ps1',

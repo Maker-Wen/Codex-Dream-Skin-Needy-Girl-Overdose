@@ -85,6 +85,7 @@
     "--dream-focus-y",
     "--dream-accent",
     "--dream-accent-ink",
+    "--ds-on-accent",
     "--dream-image-luma",
   ];
   const HOME_UTILITY_CLASS = "dream-home-utility";
@@ -197,6 +198,65 @@
     });
     return .2126 * linear[0] + .7152 * linear[1] + .0722 * linear[2];
   };
+  const parseRgbColor = (value) => {
+    if (!value || value === "transparent") return null;
+    const hex = String(value).trim().match(/^#([0-9a-f]{3,4}|[0-9a-f]{6}|[0-9a-f]{8})$/i);
+    if (hex) {
+      const digits = hex[1];
+      const rgbHex = digits.length <= 4
+        ? digits.slice(0, 3).split("").map((digit) => `${digit}${digit}`).join("")
+        : digits.slice(0, 6);
+      const alphaHex = digits.length === 4
+        ? `${digits[3]}${digits[3]}`
+        : digits.length === 8 ? digits.slice(6, 8) : "ff";
+      const number = Number.parseInt(rgbHex, 16);
+      return {
+        r: number >> 16,
+        g: (number >> 8) & 255,
+        b: number & 255,
+        alpha: Number.parseInt(alphaHex, 16) / 255,
+      };
+    }
+    const match = String(value).trim().match(
+      /^rgba?\(\s*([\d.]+)(?:\s*,\s*|\s+)([\d.]+)(?:\s*,\s*|\s+)([\d.]+)(?:(?:\s*,\s*|\s*\/\s*)([\d.]+%?))?\s*\)$/i,
+    );
+    if (!match) return null;
+    const alpha = match[4] === undefined
+      ? 1
+      : String(match[4]).endsWith("%") ? Number.parseFloat(match[4]) / 100 : Number(match[4]);
+    return {
+      r: Number(match[1]),
+      g: Number(match[2]),
+      b: Number(match[3]),
+      alpha: clamp(alpha),
+    };
+  };
+  const compositeColor = (value, background, alphaOverride = null) => {
+    const foreground = parseRgbColor(value);
+    if (!foreground) return null;
+    const alpha = clamp(alphaOverride ?? foreground.alpha ?? 1);
+    return {
+      r: clamp(foreground.r / 255) * 255 * alpha + background.r * (1 - alpha),
+      g: clamp(foreground.g / 255) * 255 * alpha + background.g * (1 - alpha),
+      b: clamp(foreground.b / 255) * 255 * alpha + background.b * (1 - alpha),
+    };
+  };
+  const readableAccentInk = (accent, panel) => {
+    const panelColor = parseRgbColor(panel);
+    if (!parseRgbColor(accent) || !panelColor) return null;
+    const values = [0, 255].map((backdrop) => {
+      const surface = compositeColor(
+        panel,
+        { r: backdrop, g: backdrop, b: backdrop },
+        .94,
+      );
+      const renderedAccent = compositeColor(accent, surface);
+      return luminance(renderedAccent.r, renderedAccent.g, renderedAccent.b);
+    });
+    const whiteContrast = Math.min(...values.map((value) => 1.05 / (value + .05)));
+    const blackContrast = Math.min(...values.map((value) => (value + .05) / .05));
+    return whiteContrast >= blackContrast ? "rgb(255 255 255)" : "rgb(0 0 0)";
+  };
   const defaultProfile = {
     appearance: "dark",
     accent: [108, 131, 142],
@@ -219,12 +279,18 @@
     const colorsAccentIsExplicit = typeof config?.colors?.accent === "string" &&
       (explicitColorKeys?.has("accent") ||
         (!explicitColorKeys && config.colorMode === "explicit"));
+    const colorsPanelIsExplicit = typeof config?.colors?.panel === "string" &&
+      (explicitColorKeys?.has("panel") ||
+        (!explicitColorKeys && config.colorMode === "explicit"));
     const requestedAccent = colorsAccentIsExplicit
       ? config.colors.accent.trim()
       : (typeof config?.palette?.accent === "string" ? config.palette.accent.trim() : "");
-    const safeAccent = /^(?:#[\da-f]{3,8}|(?:rgb|hsl|oklch|oklab)\([^;{}]{1,96}\))$/i.test(requestedAccent)
+    const requestedPanel = colorsPanelIsExplicit ? config.colors.panel.trim() : "";
+    const safeColor = /^(?:#[\da-f]{3,8}|(?:rgb|hsl|oklch|oklab)\([^;{}]{1,96}\))$/i;
+    const safeAccent = safeColor.test(requestedAccent)
       ? requestedAccent
       : null;
+    const safePanel = safeColor.test(requestedPanel) ? requestedPanel : null;
     const appearance = ["auto", "light", "dark"].includes(config.appearance)
       ? config.appearance
       : "auto";
@@ -245,6 +311,7 @@
       focusX: hasNumber(art.focusX) ? clamp(art.focusX) : null,
       focusY: hasNumber(art.focusY) ? clamp(art.focusY) : null,
       accent: safeAccent,
+      panel: safePanel,
       initialAspect: Number.isFinite(metadataRatio) && metadataRatio > 0 ? metadataRatio : null,
     };
   };
@@ -566,7 +633,14 @@
       ? profile.aspect >= 2.25 ? "banner" : "ambient"
       : config.taskMode;
     const accent = config.accent || `rgb(${profile.accent.join(" ")})`;
-    const accentInk = luminance(...profile.accent) > .42 ? "rgb(26 24 28)" : "rgb(250 248 251)";
+    const explicitAccentInk = config.accent
+      ? readableAccentInk(
+        config.accent,
+        config.panel || (appearance === "light" ? "rgb(248 248 250)" : "rgb(31 33 40)"),
+      )
+      : null;
+    const accentInk = explicitAccentInk ||
+      (luminance(...profile.accent) > .42 ? "rgb(26 24 28)" : "rgb(250 248 251)");
     root.classList.toggle("dream-theme-light", appearance === "light");
     root.classList.toggle("dream-theme-dark", appearance === "dark");
     root.classList.toggle("dream-art-wide", profile.aspect >= 1.75);
@@ -588,6 +662,8 @@
     root.style.setProperty("--dream-focus-y", String(focusY));
     root.style.setProperty("--dream-accent", accent);
     root.style.setProperty("--dream-accent-ink", accentInk);
+    if (explicitAccentInk) root.style.setProperty("--ds-on-accent", explicitAccentInk);
+    else root.style.removeProperty("--ds-on-accent");
     root.style.setProperty("--dream-image-luma", profile.luma.toFixed(3));
   };
 

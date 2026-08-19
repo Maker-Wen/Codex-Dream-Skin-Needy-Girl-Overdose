@@ -208,6 +208,7 @@ foreach ($requiredRepairContract in @(
   'scripts\validate-safe-css-file.mjs',
   'scripts\apply-community-theme.ps1',
   'scripts\patch-dream-skin.ps1',
+  'scripts\localization-windows.ps1',
   'presets\preset-gothic-void-crusade\theme.json',
   'scripts\start-dream-skin.ps1',
   'scripts\check-update.ps1',
@@ -254,6 +255,16 @@ $securityImportIndex = $common.IndexOf('Import-DreamSkinPowerShellSecurityModule
 $authenticodeIndex = $common.IndexOf('Get-AuthenticodeSignature -LiteralPath $Path -ErrorAction Stop', [System.StringComparison]::Ordinal)
 if ($securityImportIndex -lt 0 -or $authenticodeIndex -le $securityImportIndex) {
   throw 'Node signature validation can call Get-AuthenticodeSignature before the security module is loaded.'
+}
+$unicodeProbeContracts = @(
+  'ConvertFrom-DreamSkinUtf8Base64',
+  'Buffer.from(process.execPath, ''utf8'').toString(''base64'')',
+  'invalid-output', 'path-not-found', 'empty-output', 'probe-exit'
+)
+foreach ($contract in $unicodeProbeContracts) {
+  if (-not $common.Contains($contract)) {
+    throw "Unicode-safe bundled Node path validation contract is missing: $contract"
+  }
 }
 
 $iconGenerator = $builderAst.Find({

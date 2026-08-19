@@ -9,6 +9,10 @@
 
 ### 修复
 
+- 修复首次或冷启动状态下从 DreamSkin.cc 一键换肤被错误拒绝的问题：下载或写入主题前会先安全启动并验证当前会话，无法建立受支持的 CDP 会话时继续失败关闭。
+- 修复 Windows 启动失败后遗留部分颜色、背景等外观状态的问题：新增持久外观事务和三方恢复，保留并发产生的较新用户编辑。
+- PowerShell 5.1 在中文、日文等非 ASCII 临时目录中验证 bundled Node.js 路径时，改用 ASCII Base64 传输原始 UTF-8 字节并严格解码，避免控制台代码页损坏路径。
+- 渲染器会按实际 composer 面板表面计算显式强调色的前景色，修复透明或极端强调色下按钮文字对比度不稳定的问题。
 - 主题包 manifest 时间戳现在严格校验 RFC 3339；Windows 路径校验允许合法的点前缀文件名，同时继续拒绝真正的 `..` 穿越。
 - Windows 主题运行时强制要求 `schemaVersion: 1`，并只对受管 `active-theme` 中由 v1.5.13 生成、缺少 schema 的 `id=custom` 主题执行有界迁移；外部 ZIP、未知 ID 和未来 schema 仍按新合同失败关闭。
 - 共享图片元数据实现重新同步到双平台；macOS 在调用 `sips` 前先执行有界尺寸预检，且正式 App/DMG 包含并验收该辅助脚本。
@@ -16,6 +20,7 @@
 
 ### 内部
 
+- 菜单栏和 Windows 脚本新增 System / English / 中文语言选择与一致的本地化输出。
 - 根目录补充 MIT `LICENSE` 与 CDP 回环风险说明 `SECURITY.md`；CI 和 Release 检查新增共享 runtime 与 tools 测试覆盖。
 
 ## 1.5.13 — 2026-08-09
