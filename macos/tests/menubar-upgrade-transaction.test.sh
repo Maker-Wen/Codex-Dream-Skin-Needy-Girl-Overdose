@@ -7,6 +7,7 @@ TMP="$(/usr/bin/mktemp -d "${TMPDIR:-/tmp}/dream-skin-menubar-upgrade.XXXXXX")"
 trap '/bin/rm -rf "$TMP"' EXIT
 
 MENU_SHELL_FILES=(
+  localization-macos.sh
   pause-dream-skin-macos.sh
   status-dream-skin-macos.sh
   apply-from-menubar-macos.sh
