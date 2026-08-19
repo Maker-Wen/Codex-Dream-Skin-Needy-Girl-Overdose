@@ -10,7 +10,7 @@
 ### 修复
 
 - 修复 GitHub Actions 在编译后的 `:is(.composer-surface-chrome, [data-composer-surface-variant])` 选择器上误报 composer 94% 面板表面合同缺失的问题；对比度算法和实际 CSS 表面保持一致。
-- 修复菜单栏升级事务夹具漏带新增 `localization-macos.sh` 依赖的问题，确保 macOS repository regressions 与 DMG 构建使用完整的菜单栏源文件集合。
+- 修复菜单栏独立升级的部署清单和事务夹具漏带新增 `localization-macos.sh` 依赖的问题，确保升级后引擎包含完整本地化运行时，并使 macOS repository regressions 与 DMG 构建使用同一文件集合。
 
 ## 1.5.14 — 2026-08-09
 

@@ -18,6 +18,7 @@ PLUGIN_SRC="$PROJECT_ROOT/menubar/codex_dream_skin.10s.sh"
   || fail "Plugin source is missing, empty, or a symbolic link: $PLUGIN_SRC"
 
 MENU_SHELL_FILES=(
+  localization-macos.sh
   pause-dream-skin-macos.sh
   status-dream-skin-macos.sh
   apply-from-menubar-macos.sh
