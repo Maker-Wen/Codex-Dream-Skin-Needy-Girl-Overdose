@@ -4,9 +4,22 @@ Updated: 2026-08-27 CST (Asia/Shanghai)
 
 ## Codex 26.818 missing surfaces
 
-- [in progress] Extend the existing file-change summary classifier for Codex
-  26.820 `text-codex-git-added/deleted` descendants while preserving the old
+- [implemented] Commit `b4a0bdb` extends the existing file-change summary
+  classifier and mutation hints for Codex 26.820
+  `text-codex-git-added/deleted` descendants while preserving the old
   `git-decoration-added/deleted` contract and current `changes-*` CSS.
+- [TDD verified] The 26.820 fixture first failed with a missing
+  `changes-shell`, then passed after the shared selector change. The fixture
+  also proves dynamically mounted summaries schedule the existing body
+  observer, while the legacy fixture keeps all three `changes-*` markers.
+- [regression verified] The final complete macOS suite exited 0 with Swift
+  build, XCTest `12/12`, verifier `7/7`, Safe CSS `12/12`, renderer,
+  ZIP/import and transaction checks passing. Windows renderer, three-platform
+  Internet Angel sync, JavaScript syntax and `git diff --check` also pass.
+- [live gap] Revision `34aa0c08580dbf7937de` passed exact live verification,
+  but the visible file-change summary unmounted when the user switched tasks
+  before its final computed style could be sampled. Do not claim a final live
+  screenshot of this component until it appears again.
 
 - [implemented] The two Codex 26.818 opaque `from-surface` composer fades are
   cleared only inside non-Home main surfaces. The shared macOS source and the
