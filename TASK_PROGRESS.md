@@ -4,22 +4,44 @@ Updated: 2026-08-27 CST (Asia/Shanghai)
 
 ## Codex 26.818 missing surfaces
 
-- [in progress] Fix the unthemed Environment panel and the opaque native
-  fades behind the already-themed thread composer shown in the user-provided
-  screenshot.
+- [implemented] The two Codex 26.818 opaque `from-surface` composer fades are
+  cleared only inside non-Home main surfaces. The shared macOS source and the
+  fork's independent Windows base CSS carry the same bounded rule at commit
+  `db6a5fc`.
+- [implemented] Live DOM inspection showed the visible Environment panel now
+  uses `bg-surface-elevated-secondary` instead of
+  `bg-token-dropdown-background`. The shared classifier and macOS verifier
+  accept both exact surface classes while retaining the existing host,
+  geometry, button and semantic gates at commit `9e09990`.
 - [scope] Reuse the existing delayed component reconciliation and backport
   only the two exact Codex 26.818 composer-fade selectors from upstream
   `v1.5.16`; do not merge unrelated upstream removals or release changes.
 - [workspace] Worktree
   `/private/tmp/Codex-Dream-Skin-Needy-Girl-Overdose-fix-26-818` on branch
   `codex/fix-26-818-missing-surfaces`, based on clean `main` at `1190e27`.
-- [diagnosis] The installed macOS engine is `1.5.12`, while this checkout is
-  `1.5.15`. The installed extension predates the body-level dynamic
-  reconciliation now present in the shared source. The current fork also
-  clears only the older `from-token-main-surface-primary` composer fade;
-  upstream `v1.5.16` records the two current `from-surface` signatures.
-- [live gap] `status-dream-skin-macos.sh --json --deep` reports a stale session
-  with no live injector or CDP connection, so no current DOM claim is made.
+- [TDD] macOS and Windows renderer tests first failed on the missing 148 px
+  and 28 px fade signatures, then passed after the CSS change. The macOS
+  classifier and verifier tests likewise failed on the elevated Environment
+  surface, then passed after the selector union.
+- [verified] The final complete `./macos/tests/run-tests.sh` exited 0 with the
+  Swift product build, XCTest `12/12`, verifier `7/7`, Safe CSS `12/12`,
+  renderer, theme ZIP/import, installer and transaction checks passing.
+  `windows/tests/renderer-inject.test.mjs`, the three-platform Internet Angel
+  test, runtime sync, JavaScript syntax and `git diff --check` also pass.
+- [live verified] A trusted loopback CDP injection and screenshot verified
+  revision `7efded8e1d4a78310a00`: the open 300 x 331 Environment panel is
+  marked `environment` with the Angel gradient, accent strip and 2 px border;
+  the composer remains themed and the black bottom fades are gone. The exact
+  verifier returns `pass=true`, no horizontal overflow, and
+  `environmentOptionalWhenAbsent=false`.
+- [runtime state] The recorded watcher now runs this worktree's `1.5.15`
+  injector on port 9341 without restarting Codex. The installed engine remains
+  `1.5.12` and its classifier hash differs, so a persistent atomic installation
+  remains pending until Codex is closed; do not describe the current hot
+  runtime as an installed upgrade.
+- [remaining gates] Real Windows visual validation and the PowerShell suite
+  remain for CI or a Windows host. No push, PR, merge, version bump, tag or
+  Release was performed.
 - [design] See
   `docs/superpowers/specs/2026-08-27-codex-26-818-missing-surfaces-design.md`.
 
