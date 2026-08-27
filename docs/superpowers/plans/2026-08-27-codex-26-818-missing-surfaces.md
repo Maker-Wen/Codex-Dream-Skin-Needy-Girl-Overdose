@@ -165,3 +165,55 @@ Windows PowerShell 和真实 Windows 视觉验证留给 CI 或 Windows 主机，
 - [ ] **Step 5: 更新进度并提交**
 
 记录精确测试结果、部署状态和剩余实机缺口，然后提交 `TASK_PROGRESS.md`。
+
+### Task 4: 兼容 Codex 26.820 文件变更胶囊
+
+**Files:**
+
+- Modify: `runtime/internet-angel-extension.js`
+- Modify: `macos/tests/internet-angel-macos.test.mjs`
+- Modify: `macos/assets/internet-angel-extension.js`（由同步工具生成）
+- Modify: `windows/assets/internet-angel-extension.js`（由同步工具生成）
+- Modify: `linux/assets/internet-angel-extension.js`（由同步工具生成）
+
+**Interfaces:**
+
+- Consumes: 旧 `git-decoration-added/deleted` 与新 `text-codex-git-added/deleted` 子节点。
+- Produces: 兼容新旧 Codex 的 `changes-shell`、`changes-clip-host` 和 `changes-pill` 标记。
+
+- [ ] **Step 1: 添加 26.820 失败 fixture**
+
+复制现有变更胶囊 fixture，但只提供 `text-codex-git-added` 和 `text-codex-git-deleted` 子节点，并断言三个 `changes-*` 标记存在。
+
+- [ ] **Step 2: 运行红测**
+
+Run: `node macos/tests/internet-angel-macos.test.mjs`
+
+Expected: FAIL，提示 26.820 胶囊缺少 `changes-pill`。
+
+- [ ] **Step 3: 扩展现有分类器选择器**
+
+在 `classifyChanges()` 内分别定义 added 与 deleted 兼容选择器，并用两者构造候选按钮查询；保留现有文本、外壳和裁剪宿主判断。
+
+- [ ] **Step 4: 同步并运行绿测**
+
+Run: `node tools/sync-runtime-assets.mjs`
+
+Run: `node macos/tests/internet-angel-macos.test.mjs`
+
+Expected: PASS，旧、新 fixture 都获得三个 `changes-*` 标记。
+
+- [ ] **Step 5: 运行相关回归并提交**
+
+Run: `node tools/internet-angel-extension.test.mjs`
+
+Run: `node tools/sync-runtime-assets.mjs --check`
+
+Run: `git diff --check`
+
+```bash
+git add runtime/internet-angel-extension.js macos/assets/internet-angel-extension.js \
+  windows/assets/internet-angel-extension.js linux/assets/internet-angel-extension.js \
+  macos/tests/internet-angel-macos.test.mjs TASK_PROGRESS.md
+git commit -m "fix: classify Codex 26.820 change summary"
+```

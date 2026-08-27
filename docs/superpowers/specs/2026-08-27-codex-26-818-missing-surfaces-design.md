@@ -24,3 +24,9 @@
 - 运行共享 renderer、Internet Angel、macOS 与 Windows renderer 和运行时同步检查。
 - 运行 `git diff --check` 与相关 JavaScript 语法检查。
 - 只有可信 CDP 会话可用时才做热注入与截图验证；否则明确保留实机验证缺口。
+
+## Codex 26.820 变更胶囊补充
+
+Codex 26.820 将文件增删统计类名从 `git-decoration-added/deleted` 改为 `text-codex-git-added/deleted`。现有 `classifyChanges()` 继续负责识别和标记，不新增分类器或 CSS。候选按钮必须同时具备兼容后的 added 与 deleted 子节点、现有中英文“文件已更改”语义，以及现有圆角边框外壳，避免仅凭文本误标普通按钮。
+
+测试同时保留旧 DOM fixture，并新增 26.820 fixture。红测必须证明新版胶囊不会被旧选择器识别；绿测必须证明新旧胶囊都获得 `changes-shell`、`changes-clip-host` 和 `changes-pill` 标记。

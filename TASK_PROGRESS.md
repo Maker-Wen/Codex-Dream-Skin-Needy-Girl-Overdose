@@ -4,6 +4,10 @@ Updated: 2026-08-27 CST (Asia/Shanghai)
 
 ## Codex 26.818 missing surfaces
 
+- [in progress] Extend the existing file-change summary classifier for Codex
+  26.820 `text-codex-git-added/deleted` descendants while preserving the old
+  `git-decoration-added/deleted` contract and current `changes-*` CSS.
+
 - [implemented] The two Codex 26.818 opaque `from-surface` composer fades are
   cleared only inside non-Home main surfaces. The shared macOS source and the
   fork's independent Windows base CSS carry the same bounded rule at commit
