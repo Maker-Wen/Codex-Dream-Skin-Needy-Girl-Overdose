@@ -1,6 +1,27 @@
 # Task Progress
 
-Updated: 2026-08-13 CST (Asia/Shanghai)
+Updated: 2026-08-27 CST (Asia/Shanghai)
+
+## Codex 26.818 missing surfaces
+
+- [in progress] Fix the unthemed Environment panel and the opaque native
+  fades behind the already-themed thread composer shown in the user-provided
+  screenshot.
+- [scope] Reuse the existing delayed component reconciliation and backport
+  only the two exact Codex 26.818 composer-fade selectors from upstream
+  `v1.5.16`; do not merge unrelated upstream removals or release changes.
+- [workspace] Worktree
+  `/private/tmp/Codex-Dream-Skin-Needy-Girl-Overdose-fix-26-818` on branch
+  `codex/fix-26-818-missing-surfaces`, based on clean `main` at `1190e27`.
+- [diagnosis] The installed macOS engine is `1.5.12`, while this checkout is
+  `1.5.15`. The installed extension predates the body-level dynamic
+  reconciliation now present in the shared source. The current fork also
+  clears only the older `from-token-main-surface-primary` composer fade;
+  upstream `v1.5.16` records the two current `from-surface` signatures.
+- [live gap] `status-dream-skin-macos.sh --json --deep` reports a stale session
+  with no live injector or CDP connection, so no current DOM claim is made.
+- [design] See
+  `docs/superpowers/specs/2026-08-27-codex-26-818-missing-surfaces-design.md`.
 
 ## macOS and Windows style parity
 
