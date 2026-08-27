@@ -8,7 +8,7 @@
     composerFooter: ':is([class*="_footer_"], [data-composer-footer-responsive])',
     stickyComposer: 'main:is(.main-surface, [data-app-shell-main-surface], [class*="_MainContentSurface_"]) [class~="sticky"][class~="bottom-0"]',
     contextStrip: 'div[class~="relative"][class~="min-w-0"][class~="overflow-clip"][class~="border-x"][class~="border-t"]',
-    environmentPanel: 'div[class*="bg-token-dropdown-background"][class~="rounded-3xl"]',
+    environmentPanel: 'div:is([class*="bg-token-dropdown-background"], [class~="bg-surface-elevated-secondary"])[class~="rounded-3xl"]',
     environmentToggle: 'button[class~="group/section-toggle"]',
     environmentGit: '[data-testid*="git"], [aria-label*="git" i], [class*="git-"]',
     workspace: '[class*="contain:layout_paint"], [class~="bg-token-main-surface-primary"]',

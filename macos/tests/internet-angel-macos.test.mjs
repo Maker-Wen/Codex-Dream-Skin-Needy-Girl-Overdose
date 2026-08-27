@@ -715,7 +715,7 @@ function makeOverlayFixture({
     .addQuery(environmentGitSelector, gitSignal);
 
   const structuralEnvironment = makeNode({
-    className: "relative rounded-3xl bg-token-dropdown-background",
+    className: "relative rounded-3xl bg-surface-elevated-secondary",
     rect: { left: 1378, top: 58, width: 300, height: 199 },
     text: "Tools",
   });
@@ -1024,6 +1024,11 @@ function makeOverlayFixture({
     [composerSelector, delayedPublicComposer ? [] : [composer]],
     [`${shellSelector} [class~="sticky"][class~="bottom-0"]`, [sticky]],
     ['div[class*="bg-token-dropdown-background"][class~="rounded-3xl"]', [
+      environment,
+      radixEnvironment,
+      lookalike,
+    ]],
+    ['div:is([class*="bg-token-dropdown-background"], [class~="bg-surface-elevated-secondary"])[class~="rounded-3xl"]', [
       environment,
       structuralEnvironment,
       radixEnvironment,
@@ -1636,7 +1641,11 @@ assert.equal(component(dynamicSystemToast.systemToast), "system-toast");
 assert.equal(dynamicSystemToastMetrics.classifyRuns, 2);
 
 const detachedEnvironmentEvidence = activateOverlayFixture();
-assert.equal(component(detachedEnvironmentEvidence.structuralEnvironment), "environment");
+assert.equal(
+  component(detachedEnvironmentEvidence.structuralEnvironment),
+  "environment",
+  "Codex 26.818 elevated Environment surfaces must retain the existing semantic classifier.",
+);
 assert.equal(component(detachedEnvironmentEvidence.structuralGitHost), null);
 assert.equal(component(detachedEnvironmentEvidence.structuralGitSignal), null);
 detachedEnvironmentEvidence.removeStructuralEnvironmentGitEvidence();
