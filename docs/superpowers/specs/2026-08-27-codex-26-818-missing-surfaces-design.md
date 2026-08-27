@@ -9,7 +9,7 @@
 - 保留现有 `data-angel-component` 分类和共享运行时架构。
 - 用现有动态重新分类逻辑覆盖延迟挂载的环境信息面板，不新增第二套观察器。
 - 在共享基础 CSS 中精确清除 Codex 26.818 的两种输入区渐隐层。
-- 通过现有同步工具生成 macOS、Windows 和 Linux 平台副本。
+- 通过现有同步工具从共享基础 CSS 生成 macOS 副本，并在 fork 独立维护的 Windows 基础 CSS 中加入同一精确规则。Internet Angel 分类器继续由共享源生成三端副本。
 - 不合并上游 `v1.5.16` 的其他改动，不修改主题包、安装器、版本号或发布配置。
 
 ## 实现
@@ -21,6 +21,6 @@
 ## 验证
 
 - 先增加会失败的共享运行时断言，再添加最小 CSS 改动。
-- 运行共享 renderer、Internet Angel、macOS renderer 和运行时同步检查。
+- 运行共享 renderer、Internet Angel、macOS 与 Windows renderer 和运行时同步检查。
 - 运行 `git diff --check` 与相关 JavaScript 语法检查。
 - 只有可信 CDP 会话可用时才做热注入与截图验证；否则明确保留实机验证缺口。
