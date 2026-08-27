@@ -4,6 +4,10 @@ Updated: 2026-08-27 CST (Asia/Shanghai)
 
 ## Codex 26.818 missing surfaces
 
+- [PR readiness] Added `Unreleased` entries to both platform changelogs. The
+  user explicitly chose not to attach a screenshot. PR Notes must state that
+  macOS live verification passed, while Windows PowerShell and real Windows
+  visual validation remain CI or physical-host gates.
 - [implemented] Commit `b4a0bdb` extends the existing file-change summary
   classifier and mutation hints for Codex 26.820
   `text-codex-git-added/deleted` descendants while preserving the old
