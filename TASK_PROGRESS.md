@@ -4,6 +4,11 @@ Updated: 2026-08-27 CST (Asia/Shanghai)
 
 ## Codex 26.818 missing surfaces
 
+- [PR opened] Branch `codex/fix-26-818-missing-surfaces` was pushed to the
+  `Maker-Wen` fork after the authenticated account was denied direct write
+  access to `EmiyaKatuz`. Cross-fork PR #27 targets `EmiyaKatuz/main`:
+  `https://github.com/EmiyaKatuz/Codex-Dream-Skin-Needy-Girl-Overdose/pull/27`.
+  The PR is open, not merged, and no tag or Release has been created.
 - [PR readiness] Added `Unreleased` entries to both platform changelogs. The
   user explicitly chose not to attach a screenshot. PR Notes must state that
   macOS live verification passed, while Windows PowerShell and real Windows
